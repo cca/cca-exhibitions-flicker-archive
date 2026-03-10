@@ -32,6 +32,8 @@ Guidelines:
 - exhibition_title: Use the album title as a starting point, but prefer a more
   formal exhibition title if one is clearly stated in the description.
 - artists: List individual artist names. If it's a group show, list all named artists.
+  If a person appears under multiple names (legal name, stage name, nickname),
+  list them only once using the name most prominently used in the description.
 - curator: The person credited as curator, if mentioned.
 - venue: The specific gallery or space name only (e.g., "Novack Gallery",
   "CCA Campus Gallery", "CCA Hubbell Street Galleries", "Oliver Art Center").
@@ -39,7 +41,8 @@ Guidelines:
 - address: The full street address if provided (e.g., "145 Hooper Street,
   San Francisco, CA, 94107"). Often appears after a pipe character next to the venue.
 - photographer: The person credited as photographer. Look for patterns like
-  "Photo by ...", "Photos by ...", "Photographed by ...", or "Taken by ...".
+  "Photo by ...", "Photos by ...", "Photographed by ...", "Taken by ...",
+  "Images courtesy of ...", or "Image courtesy of ...".
   This is very common in CCA album descriptions.
 - opening_date / closing_date: Exhibition run dates if mentioned.
 - reception_date: Opening reception date/time if mentioned.

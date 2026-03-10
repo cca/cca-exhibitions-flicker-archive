@@ -78,7 +78,7 @@ LICENSE_MAP = {
 
 
 _PHOTOGRAPHER_RE = re.compile(
-    r"^(?:photo|photos|taken|photographed)\s+by\s+(.+)$",
+    r"^(?:photo|photos|taken|photographed|images?\s+courtesy)\s+(?:by|of)\s+(.+?)\.?$",
     re.IGNORECASE,
 )
 

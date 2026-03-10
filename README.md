@@ -61,6 +61,23 @@ uv run cca-archive --all --skip-llm
 uv run cca-archive --all --skip-download --skip-llm
 ```
 
+## Validated example albums
+
+These 3 albums span the full range of description formats across 2015–2026 and exercise every extraction edge case in the pipeline.
+
+| Album | ID | Photos | Era | What it tests |
+|---|---|---|---|---|
+| **Afterlight** | `72177720332161605` | 59 | 2026 | Structured modern format. Curator is a seminar (not a person), no named artists in description, photographer backfilled from photo titles. |
+| **Josh "Sioux" Reyes** | `72157691676973492` | 12 | 2018 | HTML `<a>` tags in description, Instagram handle, quoted exhibition title, "Images courtesy of" credit pattern, artist stage-name ambiguity. |
+| **New Look** | `72157659826175192` | 15 | 2015 | Sparse single-sentence description (114 chars). LLM must parse unstructured text with no artists, no curator, no medium. |
+
+```bash
+# Run all 3 (metadata + CSV only)
+uv run cca-archive 72177720332161605 --skip-download
+uv run cca-archive 72157691676973492 --skip-download
+uv run cca-archive 72157659826175192 --skip-download
+```
+
 ## Output
 
 ```
