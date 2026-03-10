@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,8 +21,18 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_api_key: str = ""
 
+    skip_llm: bool = False
     output_dir: Path = Path("output")
     download_concurrency: int = 5
+
+    @model_validator(mode="after")
+    def _check_llm_api_key(self) -> "Settings":
+        if not self.skip_llm and not self.anthropic_api_key and not self.openai_api_key:
+            raise ValueError(
+                "At least one LLM API key (anthropic_api_key or openai_api_key) "
+                "must be provided when skip_llm is not set"
+            )
+        return self
 
     @property
     def images_dir(self) -> Path:

@@ -11,7 +11,7 @@ from slugify import slugify
 from .config import get_settings
 from .csv_export import export_album_csv
 from .downloader import download_photos
-from .flickr_client import FlickrClient, parse_album_url
+from .flickr_client import FlickrClient, extract_photographer_from_photos, parse_album_url
 from .llm import extract_exhibition_metadata
 
 console = Console()
@@ -22,8 +22,11 @@ async def process_album(
     client: FlickrClient,
     skip_download: bool = False,
     skip_llm: bool = False,
-) -> None:
-    """Process a single album: fetch data, extract metadata, download, export CSV."""
+) -> int:
+    """Process a single album: fetch data, extract metadata, download, export CSV.
+
+    Returns the number of photos in the album.
+    """
     settings = client.settings
 
     console.print(f"\n[bold]Fetching album [cyan]{album_id}[/cyan]...[/bold]")
@@ -47,6 +50,13 @@ async def process_album(
         except Exception as e:
             console.print(f"  [red]LLM extraction failed: {e}[/red]")
 
+    # Backfill photographer from photo titles/descriptions if LLM didn't find one
+    if album.exhibition and not album.exhibition.photographer and album.photos:
+        photographer = extract_photographer_from_photos(album.photos)
+        if photographer:
+            album.exhibition.photographer = photographer
+            console.print(f"  Photographer (from photos): [green]{photographer}[/green]")
+
     # Download images
     if not skip_download and album.photos:
         album_slug = slugify(album.title)
@@ -59,6 +69,8 @@ async def process_album(
     # Export CSV
     csv_path = export_album_csv(album, settings.csv_dir)
     console.print(f"  [bold green]CSV exported:[/bold green] {csv_path}")
+
+    return album.photo_count
 
 
 async def process_all_albums(
@@ -83,13 +95,30 @@ async def process_all_albums(
         table.add_row(str(a["id"]), str(title), str(a.get("photos", "?")))
     console.print(table)
 
+    total_albums_processed = 0
+    total_photos = 0
+    total_failures = 0
+
     for a in albums:
         album_id = str(a["id"])
         try:
-            await process_album(album_id, client, skip_download, skip_llm)
+            photo_count = await process_album(album_id, client, skip_download, skip_llm)
+            total_albums_processed += 1
+            total_photos += photo_count
         except Exception as e:
             console.print(f"[red]Error processing album {album_id}: {e}[/red]")
+            total_failures += 1
             continue
+
+    # Print run summary
+    summary = Table(title="Run Summary")
+    summary.add_column("Metric", style="bold")
+    summary.add_column("Value", justify="right")
+    summary.add_row("Albums processed", str(total_albums_processed))
+    summary.add_row("Total photos", str(total_photos))
+    summary.add_row("Failed albums", str(total_failures))
+    console.print()
+    console.print(summary)
 
 
 def main() -> None:

@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+from rich.console import Console
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -14,6 +15,8 @@ from rich.progress import (
 )
 
 from .models import PhotoRecord
+
+_console = Console(stderr=True)
 
 
 def _get_download_url(photo: PhotoRecord) -> str | None:
@@ -65,15 +68,34 @@ async def download_photos(
                     return photo.model_copy(update={"local_filename": filename})
 
                 async with semaphore:
-                    try:
-                        resp = await client.get(url)
-                        resp.raise_for_status()
-                        filepath.write_bytes(resp.content)
-                        progress.advance(task)
-                        return photo.model_copy(update={"local_filename": filename})
-                    except httpx.HTTPError:
-                        progress.advance(task)
-                        return photo
+                    last_exc: httpx.HTTPError | None = None
+                    for attempt in range(2):  # 1 initial + 1 retry
+                        try:
+                            resp = await client.get(url)
+                            resp.raise_for_status()
+                            filepath.write_bytes(resp.content)
+                            progress.advance(task)
+                            return photo.model_copy(update={"local_filename": filename})
+                        except (httpx.TimeoutException, httpx.HTTPStatusError) as exc:
+                            is_retryable = isinstance(exc, httpx.TimeoutException) or (
+                                isinstance(exc, httpx.HTTPStatusError)
+                                and exc.response.status_code >= 500
+                            )
+                            if is_retryable and attempt == 0:
+                                last_exc = exc
+                                await asyncio.sleep(1)
+                                continue
+                            last_exc = exc
+                            break
+                        except httpx.HTTPError as exc:
+                            last_exc = exc
+                            break
+
+                    _console.print(
+                        f"[bold red]Download failed[/bold red] photo {photo.photo_id}: {last_exc}"
+                    )
+                    progress.advance(task)
+                    return photo
 
             tasks = [_download(photo) for photo in photos]
             updated = await asyncio.gather(*tasks)
