@@ -13,6 +13,8 @@ class ExhibitionMetadata(BaseModel):
     artists: list[str] = []
     curator: Optional[str] = None
     venue: Optional[str] = None
+    address: Optional[str] = None
+    photographer: Optional[str] = None
     opening_date: Optional[date] = None
     closing_date: Optional[date] = None
     reception_date: Optional[date] = None
