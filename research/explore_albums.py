@@ -1,5 +1,6 @@
 """Survey all albums — print summary table and save descriptions."""
 
+import argparse
 import json
 from pathlib import Path
 
@@ -20,13 +21,30 @@ def _text(val) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Survey all albums — print summary table and save descriptions."
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Only fetch the first N albums.",
+    )
+    args = parser.parse_args()
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     settings = get_settings()
     client = FlickrClient(settings)
 
     console.print("[bold]Fetching all albums...[/bold]")
     albums = client.get_all_albums()
-    console.print(f"Found [cyan]{len(albums)}[/cyan] albums\n")
+    console.print(f"Found [cyan]{len(albums)}[/cyan] albums total")
+
+    if args.limit is not None:
+        albums = albums[: args.limit]
+        console.print(f"Limiting to first [cyan]{len(albums)}[/cyan] albums\n")
+    else:
+        console.print()
 
     table = Table(title="CCA Exhibitions Albums")
     table.add_column("#", style="dim", justify="right")
@@ -36,6 +54,7 @@ def main() -> None:
     table.add_column("Description Preview", max_width=60)
 
     descriptions = []
+    summary_lines = []
     for i, a in enumerate(albums, 1):
         title = _text(a.get("title"))
         desc = _text(a.get("description"))
@@ -48,12 +67,22 @@ def main() -> None:
             "description": desc,
             "photo_count": a.get("photos", 0),
         })
+        # Build summary line: title | photo_count photos | description preview
+        desc_preview = desc[:60].replace("\n", " ") + ("..." if len(desc) > 60 else "")
+        summary_lines.append(f"{title}  |  {photos} photos  |  {desc_preview}")
 
     console.print(table)
 
     with open(OUTPUT_DIR / "album_descriptions.json", "w") as f:
         json.dump(descriptions, f, indent=2, ensure_ascii=False)
     console.print(f"\nSaved descriptions to {OUTPUT_DIR / 'album_descriptions.json'}")
+
+    # Write plain-text summary for quick scanning
+    summary_path = OUTPUT_DIR / "albums_summary.txt"
+    with open(summary_path, "w") as f:
+        for line in summary_lines:
+            f.write(line + "\n")
+    console.print(f"Saved plain-text summary to {summary_path}")
 
 
 if __name__ == "__main__":
