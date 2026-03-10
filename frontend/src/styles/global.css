@@ -1,0 +1,201 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap');
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --surface-raised: #1c1c1c;
+  --surface-overlay: #111;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-accent: rgba(126, 184, 218, 0.25);
+  --text: #d4d4d4;
+  --text-secondary: #999;
+  --text-dim: #555;
+  --accent: #7eb8da;
+  --accent-soft: #5a96b8;
+  --accent-bg: rgba(126, 184, 218, 0.06);
+  --warm: #c9a96e;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-mono: "DM Mono", "SF Mono", monospace;
+  --radius: 4px;
+  --radius-lg: 8px;
+  --max-width: 1200px;
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  min-height: 100dvh;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(126, 184, 218, 0.02), transparent),
+    radial-gradient(circle at 50% 100%, rgba(0, 0, 0, 0.8), transparent);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 200ms var(--ease);
+}
+
+a:hover {
+  color: #b0d8f0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  background: rgba(126, 184, 218, 0.2);
+  color: #fff;
+}
+
+/* Container */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 3vw, 2rem);
+}
+
+/* Pills */
+.pill {
+  display: inline-block;
+  padding: 0.2em 0.65em;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+
+.pill--accent {
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+  color: var(--accent);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  letter-spacing: -0.02em;
+}
+
+.empty {
+  color: var(--text-dim);
+  font-style: italic;
+  font-family: var(--font-display);
+  font-size: 0.9em;
+}
+
+/* ─── Photo Modal (:target) ─── */
+.photo-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 6, 6, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+  display: none;
+  overflow-y: auto;
+  padding: 2rem 1rem;
+}
+
+.photo-modal-overlay.is-open {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  animation: modalIn 300ms var(--ease-out) both;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.photo-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  max-width: 920px;
+  width: 100%;
+  margin: 1.5rem auto;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 24px 80px rgba(0, 0, 0, 0.6);
+  animation: modalSlide 400ms var(--ease-out) both;
+  animation-delay: 50ms;
+}
+
+@keyframes modalSlide {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.photo-modal__image {
+  width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  background: #000;
+  border-bottom: 1px solid var(--border);
+}
+
+.photo-modal__body {
+  padding: 1.5rem;
+}
+
+.photo-modal__close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-bottom: 1.25rem;
+  padding: 0.35em 0.85em;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  transition: all 200ms var(--ease);
+}
+
+.photo-modal__close:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+  background: var(--surface-raised);
+}

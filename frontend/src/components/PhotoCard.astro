@@ -1,0 +1,106 @@
+---
+import type { Photo } from "../lib/data";
+
+interface Props {
+  photo: Photo;
+  albumSlug: string;
+}
+
+const { photo, albumSlug } = Astro.props;
+---
+
+<a href="#" data-photo-id={photo.photo_id} class="photo-card">
+  <div class="photo-card__inner">
+    {
+      photo.image_src ? (
+        <img src={photo.thumbnail_src || photo.image_src} alt={photo.photo_title || "Exhibition photo"} loading="lazy" decoding="async" width="400" height="400" />
+      ) : (
+        <div class="photo-card__empty">No image</div>
+      )
+    }
+    <div class="photo-card__scrim">
+      {photo.photo_title && (
+        <span class="photo-card__title">{photo.photo_title}</span>
+      )}
+    </div>
+  </div>
+</a>
+
+<style>
+  .photo-card {
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    position: relative;
+    transition: all 300ms var(--ease);
+  }
+
+  .photo-card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .photo-card__inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  .photo-card__inner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 500ms var(--ease), filter 400ms var(--ease);
+    filter: brightness(0.88) saturate(0.85);
+  }
+
+  .photo-card:hover .photo-card__inner img {
+    transform: scale(1.06);
+    filter: brightness(1) saturate(1);
+  }
+
+  .photo-card__empty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-style: italic;
+    font-family: var(--font-display);
+  }
+
+  .photo-card__scrim {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.65) 0%,
+      rgba(0, 0, 0, 0) 45%
+    );
+    opacity: 0;
+    transition: opacity 300ms var(--ease);
+    padding: 0.6rem;
+  }
+
+  .photo-card:hover .photo-card__scrim {
+    opacity: 1;
+  }
+
+  .photo-card__title {
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    letter-spacing: 0.01em;
+  }
+</style>

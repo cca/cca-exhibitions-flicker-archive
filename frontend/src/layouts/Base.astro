@@ -1,0 +1,129 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — CCA Exhibitions Archive</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="container site-nav">
+        <a href="/" class="site-wordmark">
+          <span class="wordmark-cca">CCA</span>
+          <span class="wordmark-divider"></span>
+          <span class="wordmark-label">Exhibitions Archive</span>
+        </a>
+        <span class="site-badge">Flickr Archive</span>
+      </nav>
+    </header>
+    <main class="container site-main">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span class="footer-rule"></span>
+        <p>California College of the Arts</p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header {
+    padding: 1.25rem 0;
+    margin-bottom: 2.5rem;
+  }
+
+  .site-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .site-wordmark {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text);
+    text-decoration: none;
+    transition: opacity 200ms var(--ease);
+  }
+
+  .site-wordmark:hover {
+    opacity: 0.75;
+    color: var(--text);
+  }
+
+  .wordmark-cca {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  .wordmark-divider {
+    width: 1px;
+    height: 1.1rem;
+    background: var(--border-hover);
+  }
+
+  .wordmark-label {
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .site-badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    padding: 0.25em 0.6em;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    letter-spacing: 0.03em;
+  }
+
+  .site-main {
+    min-height: calc(100dvh - 11rem);
+    padding-bottom: 4rem;
+  }
+
+  .site-footer {
+    padding: 2rem 0;
+  }
+
+  .footer-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .footer-rule {
+    display: block;
+    width: 2rem;
+    height: 1px;
+    background: var(--border-hover);
+  }
+
+  .footer-inner p {
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+</style>

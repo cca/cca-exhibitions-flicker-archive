@@ -1,0 +1,135 @@
+---
+import type { Album } from "../lib/data";
+
+interface Props {
+  album: Album;
+}
+
+const { album } = Astro.props;
+
+const dash = "\u2014";
+
+const fields: [string, string | string[], "mono" | "link" | "text"][] = [
+  ["Exhibition Title", album.exhibition_title, "text"],
+  ["Artists", album.artists, "text"],
+  ["Curator", album.curator, "text"],
+  ["Venue", album.venue, "text"],
+  ["Address", album.address, "text"],
+  ["Photographer", album.photographer, "text"],
+  ["Opening Date", album.opening_date, "mono"],
+  ["Closing Date", album.closing_date, "mono"],
+  ["Reception Date", album.reception_date, "mono"],
+  ["Medium", album.medium, "text"],
+  ["Summary", album.description_summary, "text"],
+  ["Album Title", album.album_title, "text"],
+  ["Album ID", album.album_id, "mono"],
+  ["Album URL", album.album_url, "link"],
+  ["Photo Count", String(album.album_photo_count), "mono"],
+  ["Date Created", album.album_date_created, "mono"],
+];
+---
+
+<dl class="meta-table">
+  {
+    fields.map(([label, value, kind]) => (
+      <div class="meta-row">
+        <dt class="meta-label">{label}</dt>
+        <dd class="meta-value">
+          {Array.isArray(value) ? (
+            value.length > 0 ? (
+              <span class="pill-list">
+                {value.map((v) => (
+                  <span class="pill">{v}</span>
+                ))}
+              </span>
+            ) : (
+              <span class="empty">{dash}</span>
+            )
+          ) : kind === "link" && value ? (
+            <a href={value} target="_blank" rel="noopener" class="mono meta-link">
+              {value}
+            </a>
+          ) : kind === "mono" ? (
+            <span class="mono">{value || <span class="empty">{dash}</span>}</span>
+          ) : value ? (
+            <span>{value}</span>
+          ) : (
+            <span class="empty">{dash}</span>
+          )}
+        </dd>
+      </div>
+    ))
+  }
+</dl>
+
+<style>
+  .meta-table {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .meta-row {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    min-height: 2.5rem;
+  }
+
+  .meta-row + .meta-row {
+    border-top: 1px solid var(--border);
+  }
+
+  .meta-label {
+    padding: 0.55rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--surface-raised);
+    display: flex;
+    align-items: center;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .meta-value {
+    padding: 0.55rem 1rem;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    word-break: break-word;
+  }
+
+  .meta-link {
+    color: var(--accent);
+    font-size: 0.78rem;
+  }
+
+  .meta-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .pill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  @media (max-width: 640px) {
+    .meta-row {
+      grid-template-columns: 1fr;
+    }
+
+    .meta-label {
+      padding: 0.45rem 0.85rem 0.25rem;
+    }
+
+    .meta-value {
+      padding: 0.25rem 0.85rem 0.55rem;
+    }
+  }
+</style>

@@ -1,0 +1,396 @@
+---
+import Base from "../../layouts/Base.astro";
+import MetadataTable from "../../components/MetadataTable.astro";
+import PhotoGrid from "../../components/PhotoGrid.astro";
+import { getAllAlbums, getAlbumBySlug } from "../../lib/data";
+import type { Album, Photo } from "../../lib/data";
+
+export function getStaticPaths() {
+  return getAllAlbums().map((album) => ({
+    params: { slug: album.slug },
+  }));
+}
+
+const { slug } = Astro.params;
+const album = getAlbumBySlug(slug!)!;
+
+function formatDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function licenseName(code: string): string {
+  const map: Record<string, string> = {
+    "0": "All Rights Reserved",
+    "1": "CC BY-NC-SA 2.0",
+    "2": "CC BY-NC 2.0",
+    "3": "CC BY-NC-ND 2.0",
+    "4": "CC BY 2.0",
+    "5": "CC BY-SA 2.0",
+    "6": "CC BY-ND 2.0",
+    "7": "No known copyright restrictions",
+    "8": "US Government Work",
+    "9": "CC0 1.0",
+    "10": "PDM 1.0",
+  };
+  return map[code] || code || "\u2014";
+}
+
+const dateRange =
+  album.opening_date && album.closing_date
+    ? `${album.opening_date} \u2014 ${album.closing_date}`
+    : album.opening_date || album.closing_date || "";
+---
+
+<Base title={album.exhibition_title || album.album_title}>
+  <div class="album-header">
+    <a href="/" class="back-link">&larr; All exhibitions</a>
+    <h1 class="album-title">{album.exhibition_title || album.album_title}</h1>
+    <div class="album-byline">
+      {album.venue && <span class="byline-venue">{album.venue}</span>}
+      {dateRange && <span class="byline-date">{dateRange}</span>}
+    </div>
+    {
+      album.description_summary && (
+        <p class="album-summary">{album.description_summary}</p>
+      )
+    }
+  </div>
+
+  <section class="section">
+    <div class="section-label">
+      <span class="section-label__text">Metadata</span>
+      <span class="section-label__line"></span>
+    </div>
+    <MetadataTable album={album} />
+  </section>
+
+  {
+    album.raw_description && (
+      <section class="section">
+        <div class="section-label">
+          <span class="section-label__text">Original Description</span>
+          <span class="section-label__line" />
+        </div>
+        <pre class="raw-desc">{album.raw_description}</pre>
+      </section>
+    )
+  }
+
+  <section class="section">
+    <div class="section-label">
+      <span class="section-label__text">Photographs</span>
+      <span class="section-label__line"></span>
+    </div>
+    <PhotoGrid photos={album.photos} albumSlug={album.slug} />
+  </section>
+
+  <script type="application/json" id="photo-data" set:html={JSON.stringify(album.photos)} />
+
+  <div id="photo-modal" class="photo-modal-overlay" aria-hidden="true">
+    <div class="photo-modal">
+      <div class="photo-modal__body">
+        <button class="photo-modal__close" type="button">&larr; Back to album</button>
+        <img class="photo-modal__image" loading="lazy" decoding="async" />
+        <div class="modal-meta">
+          <h3 class="modal-title"></h3>
+          <dl class="modal-fields">
+            <div class="modal-row"><dt class="modal-label">Photo ID</dt><dd class="mono" data-field="photo_id"></dd></div>
+            <div class="modal-row"><dt class="modal-label">Description</dt><dd data-field="photo_description"></dd></div>
+            <div class="modal-row"><dt class="modal-label">Tags</dt><dd data-field="photo_tags"></dd></div>
+            <div class="modal-row"><dt class="modal-label">Date Taken</dt><dd class="mono" data-field="date_taken"></dd></div>
+            <div class="modal-row"><dt class="modal-label">Date Uploaded</dt><dd class="mono" data-field="date_uploaded"></dd></div>
+            <div class="modal-row"><dt class="modal-label">Views</dt><dd class="mono" data-field="photo_views"></dd></div>
+            <div class="modal-row"><dt class="modal-label">License</dt><dd data-field="license"></dd></div>
+            <div class="modal-row"><dt class="modal-label">Original URL</dt><dd data-field="original_url"></dd></div>
+            <div class="modal-row"><dt class="modal-label">Local File</dt><dd class="mono" data-field="local_filename"></dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const photos = JSON.parse(document.getElementById("photo-data")!.textContent!);
+    const photoMap = new Map(photos.map((p: any) => [p.photo_id, p]));
+
+    const overlay = document.getElementById("photo-modal")!;
+    const modalImage = overlay.querySelector<HTMLImageElement>(".photo-modal__image")!;
+    const modalTitle = overlay.querySelector<HTMLElement>(".modal-title")!;
+    const closeBtn = overlay.querySelector<HTMLButtonElement>(".photo-modal__close")!;
+
+    function field(name: string): HTMLElement {
+      return overlay.querySelector<HTMLElement>(`[data-field="${name}"]`)!;
+    }
+
+    function escapeHtml(s: string): string {
+      const div = document.createElement("div");
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function formatDate(iso: string): string {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    const LICENSE_NAMES: Record<string, string> = {
+      "0": "All Rights Reserved", "1": "CC BY-NC-SA 2.0", "2": "CC BY-NC 2.0",
+      "3": "CC BY-NC-ND 2.0", "4": "CC BY 2.0", "5": "CC BY-SA 2.0",
+      "6": "CC BY-ND 2.0", "7": "No known copyright restrictions",
+      "8": "US Government Work", "9": "CC0 1.0", "10": "PDM 1.0",
+    };
+
+    const EMPTY = '<span class="empty">&mdash;</span>';
+
+    function openModal(photoId: string) {
+      const photo = photoMap.get(photoId);
+      if (!photo) return;
+
+      modalTitle.textContent = photo.photo_title || "Untitled";
+
+      if (photo.image_src) {
+        modalImage.src = photo.image_src;
+        modalImage.alt = photo.photo_title || "Photo";
+        modalImage.style.display = "";
+      } else {
+        modalImage.src = "";
+        modalImage.style.display = "none";
+      }
+
+      field("photo_id").textContent = photo.photo_id;
+      field("photo_description").innerHTML = photo.photo_description ? escapeHtml(photo.photo_description) : EMPTY;
+
+      if (photo.photo_tags && photo.photo_tags.length > 0) {
+        field("photo_tags").innerHTML = '<span class="pill-list">' +
+          photo.photo_tags.map((t: string) => `<span class="pill pill--accent">${escapeHtml(t)}</span>`).join("") +
+          "</span>";
+      } else {
+        field("photo_tags").innerHTML = EMPTY;
+      }
+
+      field("date_taken").innerHTML = formatDate(photo.date_taken) || EMPTY;
+      field("date_uploaded").innerHTML = formatDate(photo.date_uploaded) || EMPTY;
+      field("photo_views").textContent = Number(photo.photo_views).toLocaleString();
+      field("license").textContent = LICENSE_NAMES[photo.license] || photo.license || "\u2014";
+
+      if (photo.original_url) {
+        field("original_url").innerHTML =
+          `<a href="${escapeHtml(photo.original_url)}" target="_blank" rel="noopener" class="mono modal-link">${escapeHtml(photo.original_url)}</a>`;
+      } else {
+        field("original_url").innerHTML = EMPTY;
+      }
+
+      field("local_filename").innerHTML = photo.local_filename ? escapeHtml(photo.local_filename) : EMPTY;
+
+      overlay.classList.add("is-open");
+      overlay.setAttribute("aria-hidden", "false");
+    }
+
+    function closeModal() {
+      overlay.classList.remove("is-open");
+      overlay.setAttribute("aria-hidden", "true");
+      modalImage.src = "";
+    }
+
+    document.addEventListener("click", (e) => {
+      const card = (e.target as HTMLElement).closest<HTMLElement>(".photo-card[data-photo-id]");
+      if (card) {
+        e.preventDefault();
+        openModal(card.dataset.photoId!);
+      }
+    });
+
+    closeBtn.addEventListener("click", closeModal);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && overlay.classList.contains("is-open")) closeModal();
+    });
+  </script>
+</Base>
+
+<style>
+  .album-header {
+    margin-bottom: 3rem;
+  }
+
+  .back-link {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.03em;
+    margin-bottom: 1.25rem;
+    transition: color 200ms var(--ease);
+  }
+
+  .back-link:hover {
+    color: var(--accent);
+  }
+
+  .album-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4vw, 2.4rem);
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    margin-bottom: 0.5rem;
+  }
+
+  .album-byline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .byline-venue {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+  }
+
+  .byline-date {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  .album-summary {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    max-width: 65ch;
+    line-height: 1.6;
+  }
+
+  /* Section dividers */
+  .section {
+    margin-bottom: 2.5rem;
+  }
+
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .section-label__text {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .section-label__line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .raw-desc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.7;
+  }
+
+  /* Modal detail fields */
+  .modal-meta {
+    margin-top: 1.5rem;
+  }
+
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 400;
+    font-style: italic;
+    margin-bottom: 1rem;
+  }
+
+  .modal-fields {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .modal-row {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    font-size: 0.82rem;
+  }
+
+  .modal-row + .modal-row {
+    border-top: 1px solid var(--border);
+  }
+
+  .modal-label {
+    padding: 0.5rem 0.75rem;
+    color: var(--text-dim);
+    background: var(--surface-raised);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+  }
+
+  .modal-row > dd {
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    word-break: break-all;
+  }
+
+  .modal-link {
+    font-size: 0.76rem;
+  }
+
+  .modal-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .pill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  @media (max-width: 640px) {
+    .modal-row {
+      grid-template-columns: 1fr;
+    }
+
+    .modal-label {
+      padding: 0.4rem 0.75rem 0.2rem;
+    }
+
+    .modal-row > dd {
+      padding: 0.2rem 0.75rem 0.5rem;
+    }
+  }
+</style>

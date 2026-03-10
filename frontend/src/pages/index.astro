@@ -1,0 +1,134 @@
+---
+import Base from "../layouts/Base.astro";
+import ExhibitionCard from "../components/ExhibitionCard.astro";
+import { getAllAlbums } from "../lib/data";
+
+const albums = getAllAlbums();
+const totalPhotos = albums.reduce((sum, a) => sum + a.photos.length, 0);
+---
+
+<Base title="Home">
+  <div class="hero">
+    <p class="hero__eyebrow">Browse the collection</p>
+    <h1 class="hero__title">Exhibitions</h1>
+    <div class="hero__stats">
+      <span>{albums.length} albums</span>
+      <span class="hero__dot"></span>
+      <span>{totalPhotos.toLocaleString()} photographs</span>
+    </div>
+  </div>
+
+  {
+    albums.length > 0 ? (
+      <div class="album-grid">
+        {albums.map((album) => (
+          <ExhibitionCard album={album} />
+        ))}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <p>No albums found.</p>
+        <p class="empty-hint">
+          Run the archive pipeline to generate CSV data in <code>output/csv/</code>
+        </p>
+      </div>
+    )
+  }
+</Base>
+
+<style>
+  .hero {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero__eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .hero__title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 0.6rem;
+  }
+
+  .hero__stats {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .hero__dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+
+  .album-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 540px) {
+    .album-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .album-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (min-width: 1140px) {
+    .album-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .empty-state {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .empty-state p {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+  }
+
+  .empty-hint {
+    margin-top: 0.5rem;
+    font-family: var(--font-body) !important;
+    font-style: normal !important;
+    font-size: 0.85rem !important;
+    color: var(--text-dim) !important;
+  }
+
+  .empty-hint code {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: 0.82em;
+  }
+</style>
