@@ -2,7 +2,8 @@
 
 import pytest
 
-from cca_archive.flickr_client import parse_album_url, _parse_photo, _text
+from cca_archive.flickr_client import extract_photographer_from_photos, parse_album_url, _parse_photo, _text
+from cca_archive.models import PhotoRecord
 
 
 def test_parse_album_url_standard():
@@ -55,3 +56,38 @@ def test_parse_photo_with_description():
     photo = _parse_photo(data)
     assert photo.description == "A nice photo"
     assert photo.tags == ["art", "gallery", "cca"]
+
+
+def test_extract_photographer_from_titles():
+    photos = [
+        PhotoRecord(photo_id="1", title="Photo by Daniel Inclan Garcia"),
+        PhotoRecord(photo_id="2", title="Photo by Daniel Inclan Garcia"),
+        PhotoRecord(photo_id="3", title="Photo by Daniel Inclan Garcia"),
+    ]
+    assert extract_photographer_from_photos(photos) == "Daniel Inclan Garcia"
+
+
+def test_extract_photographer_from_descriptions():
+    photos = [
+        PhotoRecord(photo_id="1", title="Afterlight", description="Photo by Hayley Lin"),
+        PhotoRecord(photo_id="2", title="Afterlight", description="Photo by Hayley Lin"),
+        PhotoRecord(photo_id="3", title="Afterlight", description="Photo by Hayley Lin"),
+    ]
+    assert extract_photographer_from_photos(photos) == "Hayley Lin"
+
+
+def test_extract_photographer_none_when_no_credits():
+    photos = [
+        PhotoRecord(photo_id="1", title="IMG_001"),
+        PhotoRecord(photo_id="2", title="IMG_002"),
+    ]
+    assert extract_photographer_from_photos(photos) is None
+
+
+def test_extract_photographer_taken_by_variant():
+    photos = [
+        PhotoRecord(photo_id="1", title="Taken by Jane Doe"),
+        PhotoRecord(photo_id="2", title="Taken by Jane Doe"),
+        PhotoRecord(photo_id="3", title="Taken by Jane Doe"),
+    ]
+    assert extract_photographer_from_photos(photos) == "Jane Doe"

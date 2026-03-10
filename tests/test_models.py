@@ -13,6 +13,8 @@ def test_exhibition_metadata_minimal():
     assert meta.exhibition_title == "Test Exhibition"
     assert meta.artists == []
     assert meta.curator is None
+    assert meta.photographer is None
+    assert meta.address is None
 
 
 def test_exhibition_metadata_full():
@@ -21,6 +23,8 @@ def test_exhibition_metadata_full():
         artists=["Alice", "Bob"],
         curator="Carol",
         venue="Wattis Institute",
+        address="145 Hooper Street, San Francisco, CA, 94107",
+        photographer="Daniel Inclan Garcia",
         opening_date=date(2024, 1, 15),
         closing_date=date(2024, 3, 30),
         reception_date=date(2024, 1, 15),
@@ -30,6 +34,8 @@ def test_exhibition_metadata_full():
     )
     assert len(meta.artists) == 2
     assert meta.venue == "Wattis Institute"
+    assert meta.address == "145 Hooper Street, San Francisco, CA, 94107"
+    assert meta.photographer == "Daniel Inclan Garcia"
 
 
 def test_photo_record_defaults():
