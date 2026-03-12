@@ -58,6 +58,17 @@ function splitSemicolon(value: string): string[] {
 }
 
 function resolveImageSrc(slug: string, localFilename: string, originalUrl: string, photoId?: string): string {
+  const id = localFilename ? path.parse(localFilename).name : photoId;
+
+  // Prefer the processed 1600px WebP
+  if (id) {
+    const fullPath = path.join(IMAGES_DIR, slug, "full", `${id}.webp`);
+    if (fs.existsSync(fullPath)) {
+      return `/images/${slug}/full/${id}.webp`;
+    }
+  }
+
+  // Fall back to original local file
   if (localFilename) {
     const localPath = path.join(IMAGES_DIR, slug, localFilename);
     if (fs.existsSync(localPath)) {

@@ -2,6 +2,8 @@
 dist/
 # generated types
 .astro/
+# processed images (created by prebuild script)
+public/images/
 
 # dependencies
 node_modules/
