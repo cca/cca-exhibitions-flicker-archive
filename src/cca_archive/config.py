@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     skip_llm: bool = False
     output_dir: Path = Path("output")
-    download_concurrency: int = 5
+    download_concurrency: int = 3
 
     @model_validator(mode="after")
     def _check_llm_api_key(self) -> "Settings":

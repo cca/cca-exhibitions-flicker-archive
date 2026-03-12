@@ -17,6 +17,14 @@ from .llm import extract_exhibition_metadata
 console = Console()
 
 
+def _album_title(a: dict) -> str:
+    """Extract title string from a raw album dict."""
+    title = a.get("title", {})
+    if isinstance(title, dict):
+        title = title.get("_content", "")
+    return str(title)
+
+
 async def process_album(
     album_id: str,
     client: FlickrClient,
@@ -77,22 +85,40 @@ async def process_all_albums(
     client: FlickrClient,
     skip_download: bool = False,
     skip_llm: bool = False,
+    skip_existing: bool = False,
+    limit: int | None = None,
 ) -> None:
     """Process all albums for the configured Flickr user."""
+    settings = client.settings
     console.print("[bold]Fetching all albums...[/bold]")
     albums = client.get_all_albums()
-    console.print(f"Found [cyan]{len(albums)}[/cyan] albums\n")
+    console.print(f"Found [cyan]{len(albums)}[/cyan] albums total\n")
+
+    # Filter out already-processed albums
+    if skip_existing:
+        existing_csvs = {p.stem for p in settings.csv_dir.glob("*.csv")}
+        before = len(albums)
+        albums = [
+            a for a in albums
+            if slugify(_album_title(a)) not in existing_csvs
+        ]
+        console.print(
+            f"Skipping {before - len(albums)} already-processed albums, "
+            f"[cyan]{len(albums)}[/cyan] remaining\n"
+        )
+
+    # Apply limit
+    if limit is not None and limit < len(albums):
+        albums = albums[:limit]
+        console.print(f"Limited to first [cyan]{limit}[/cyan] albums\n")
 
     # Print summary table
-    table = Table(title="Albums")
+    table = Table(title="Albums to Process")
     table.add_column("ID", style="dim")
     table.add_column("Title")
     table.add_column("Photos", justify="right")
     for a in albums:
-        title = a.get("title", {})
-        if isinstance(title, dict):
-            title = title.get("_content", "")
-        table.add_row(str(a["id"]), str(title), str(a.get("photos", "?")))
+        table.add_row(str(a["id"]), _album_title(a), str(a.get("photos", "?")))
     console.print(table)
 
     total_albums_processed = 0
@@ -146,6 +172,17 @@ def main() -> None:
         action="store_true",
         help="Skip LLM metadata extraction",
     )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip albums that already have a CSV in the output directory",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of albums to process (useful with --all)",
+    )
 
     args = parser.parse_args()
 
@@ -156,7 +193,10 @@ def main() -> None:
     client = FlickrClient(settings)
 
     if args.all:
-        asyncio.run(process_all_albums(client, args.skip_download, args.skip_llm))
+        asyncio.run(process_all_albums(
+            client, args.skip_download, args.skip_llm,
+            skip_existing=args.skip_existing, limit=args.limit,
+        ))
     else:
         album_id = parse_album_url(args.album_url)
         asyncio.run(process_album(album_id, client, args.skip_download, args.skip_llm))

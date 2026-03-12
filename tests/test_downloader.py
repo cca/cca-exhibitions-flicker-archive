@@ -1,7 +1,7 @@
 """Tests for the async image downloader."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import httpx
 import pytest
@@ -163,3 +163,77 @@ async def test_empty_photo_list(tmp_path: Path):
         result = await download_photos([], tmp_path)
 
     assert result == []
+
+
+# ---------------------------------------------------------------------------
+# 429 retry behaviour
+# ---------------------------------------------------------------------------
+
+
+def _fake_429_response() -> httpx.Response:
+    return httpx.Response(
+        status_code=429,
+        request=httpx.Request("GET", "https://example.com/img.jpg"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_retries_on_429_then_succeeds(tmp_path: Path):
+    """First request returns 429, second succeeds — file should be downloaded."""
+    photo = _make_photo("10", "https://example.com/10.jpg")
+    resp_429 = _fake_429_response()
+    resp_200 = _fake_response(b"image data")
+
+    with (
+        patch("cca_archive.downloader.httpx.AsyncClient") as MockClient,
+        patch("cca_archive.downloader.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
+        mock_client = AsyncMock()
+        # First call raises 429, second call succeeds
+        mock_client.get.side_effect = [
+            httpx.HTTPStatusError(
+                "Too Many Requests",
+                request=httpx.Request("GET", "https://example.com/10.jpg"),
+                response=resp_429,
+            ),
+            resp_200,
+        ]
+        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        result = await download_photos([photo], tmp_path)
+
+    assert result[0].local_filename == "10.jpg"
+    assert (tmp_path / "10.jpg").read_bytes() == b"image data"
+    # asyncio.sleep should have been called for the 429 backoff (4s on attempt 0)
+    sleep_calls = [c for c in mock_sleep.call_args_list if c != call(0)]
+    assert any(args[0] >= 4 for args, _ in [c for c in sleep_calls if c[0]])
+
+
+@pytest.mark.asyncio
+async def test_429_exhausts_retries(tmp_path: Path):
+    """All attempts return 429 — download should fail after max attempts."""
+    photo = _make_photo("11", "https://example.com/11.jpg")
+
+    def _raise_429(*args, **kwargs):
+        raise httpx.HTTPStatusError(
+            "Too Many Requests",
+            request=httpx.Request("GET", "https://example.com/11.jpg"),
+            response=_fake_429_response(),
+        )
+
+    with (
+        patch("cca_archive.downloader.httpx.AsyncClient") as MockClient,
+        patch("cca_archive.downloader.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = _raise_429
+        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        result = await download_photos([photo], tmp_path)
+
+    assert result[0].local_filename is None
+    assert not (tmp_path / "11.jpg").exists()
+    # Should have attempted 5 times (1 initial + 4 retries)
+    assert mock_client.get.call_count == 5
