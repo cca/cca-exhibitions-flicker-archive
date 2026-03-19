@@ -1,26 +1,71 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* Lineto Brown — CCA brand typeface */
+@font-face {
+  font-family: "Brown";
+  src: url("/fonts/lineto-brown-light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Brown";
+  src: url("/fonts/lineto-brown-lightitalic.woff2") format("woff2");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Brown";
+  src: url("/fonts/lineto-brown-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Brown";
+  src: url("/fonts/lineto-brown-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Brown";
+  src: url("/fonts/lineto-brown-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Brown";
+  src: url("/fonts/lineto-brown-bolditalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
 
 :root {
-  --bg: #0a0a0a;
-  --surface: #141414;
-  --surface-raised: #1c1c1c;
-  --surface-overlay: #111;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.12);
-  --border-accent: rgba(126, 184, 218, 0.25);
-  --text: #d4d4d4;
-  --text-secondary: #999;
-  --text-dim: #555;
-  --accent: #7eb8da;
-  --accent-soft: #5a96b8;
-  --accent-bg: rgba(126, 184, 218, 0.06);
-  --warm: #c9a96e;
-  --font-display: "Instrument Serif", Georgia, serif;
-  --font-body: "DM Sans", system-ui, sans-serif;
-  --font-mono: "DM Mono", "SF Mono", monospace;
+  --canvas: #F5F2ED;
+  --ink: #1A1A1A;
+  --ink-light: #6B6B6B;
+  --ink-faint: #BFBAB2;
+  --accent: #00bfb3;
+  --accent-hover: #33cfc5;
+  --accent-bg: rgba(0, 191, 179, 0.08);
+  --accent-border: rgba(0, 191, 179, 0.25);
+  --immersive: #0A0A0A;
+  --surface: #FFFDF9;
+  --surface-raised: #F0EDE7;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "Brown", arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
   --radius: 4px;
   --radius-lg: 8px;
   --max-width: 1200px;
+  --page-pad: clamp(1rem, 3vw, 1.5rem);
+  --page-gutter: var(--page-pad);
   --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -42,13 +87,10 @@ html {
 
 body {
   font-family: var(--font-body);
-  background: var(--bg);
-  color: var(--text);
+  background: var(--canvas);
+  color: var(--ink);
   line-height: 1.65;
   min-height: 100dvh;
-  background-image:
-    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(126, 184, 218, 0.02), transparent),
-    radial-gradient(circle at 50% 100%, rgba(0, 0, 0, 0.8), transparent);
 }
 
 a {
@@ -58,7 +100,7 @@ a {
 }
 
 a:hover {
-  color: #b0d8f0;
+  color: var(--accent-hover);
 }
 
 img {
@@ -67,15 +109,28 @@ img {
 }
 
 ::selection {
-  background: rgba(126, 184, 218, 0.2);
-  color: #fff;
+  background: rgba(0, 191, 179, 0.2);
+  color: var(--ink);
 }
 
 /* Container */
 .container {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 clamp(1rem, 3vw, 2rem);
+  padding: 0 var(--page-pad);
+}
+
+/* Full bleed — breaks out of container to span full viewport width */
+.full-bleed {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+/* Oversized display text */
+.text-oversized {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 8vw, 7rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
 /* Pills */
@@ -87,14 +142,14 @@ img {
   border-radius: 3px;
   font-family: var(--font-body);
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--ink-light);
   line-height: 1.4;
   letter-spacing: 0.01em;
 }
 
 .pill--accent {
   background: var(--accent-bg);
-  border-color: var(--border-accent);
+  border-color: var(--accent-border);
   color: var(--accent);
 }
 
@@ -105,17 +160,62 @@ img {
 }
 
 .empty {
-  color: var(--text-dim);
+  color: var(--ink-faint);
   font-style: italic;
   font-family: var(--font-display);
   font-size: 0.9em;
 }
 
-/* ─── Photo Modal (:target) ─── */
+/* ─── Animation Keyframes ─── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes crossfade {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes kenBurns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.08) translate(-1%, -1%);
+  }
+}
+
+/* ─── Photo Modal ─── */
 .photo-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(6, 6, 6, 0.96);
+  background: rgba(245, 242, 237, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   z-index: 100;
@@ -149,8 +249,8 @@ img {
   margin: 1.5rem auto;
   overflow: hidden;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.03),
-    0 24px 80px rgba(0, 0, 0, 0.6);
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 24px 80px rgba(0, 0, 0, 0.1);
   animation: modalSlide 400ms var(--ease-out) both;
   animation-delay: 50ms;
 }
@@ -170,7 +270,7 @@ img {
   width: 100%;
   max-height: 72vh;
   object-fit: contain;
-  background: #000;
+  background: var(--ink);
   border-bottom: 1px solid var(--border);
 }
 
@@ -187,15 +287,16 @@ img {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  color: var(--text-dim);
+  color: var(--ink-faint);
   font-family: var(--font-body);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
+  cursor: pointer;
   transition: all 200ms var(--ease);
 }
 
 .photo-modal__close:hover {
-  color: var(--text);
+  color: var(--ink);
   border-color: var(--border-hover);
   background: var(--surface-raised);
 }

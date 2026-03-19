@@ -1,0 +1,102 @@
+---
+interface Props {
+  years: string[];
+}
+
+const { years } = Astro.props;
+---
+
+<nav class="timeline-nav" id="timeline-nav">
+  <div class="timeline-nav__inner">
+    <div class="timeline-nav__top">
+      <div class="timeline-nav__years" id="timeline-nav-years">
+        {years.map((year) => (
+          <a
+            href={`#year-${year}`}
+            class="timeline-nav__link"
+            data-nav-year={year}
+          >
+            {year}
+          </a>
+        ))}
+      </div>
+    </div>
+    <div class="timeline-nav__progress">
+      <div class="timeline-nav__progress-fill" id="timeline-progress"></div>
+    </div>
+  </div>
+</nav>
+
+<style>
+  .timeline-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(245, 242, 237, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .timeline-nav__inner {
+    padding: 0 var(--page-gutter);
+  }
+
+  .timeline-nav__top {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .timeline-nav__years {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.75rem 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex: 1;
+    min-width: 0;
+  }
+
+
+  .timeline-nav__years::-webkit-scrollbar {
+    display: none;
+  }
+
+  .timeline-nav__link {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--ink-faint);
+    text-decoration: none;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    transition: color 200ms var(--ease), font-weight 200ms var(--ease);
+    flex-shrink: 0;
+  }
+
+  .timeline-nav__link:hover {
+    color: var(--ink);
+  }
+
+  .timeline-nav__link.is-active {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .timeline-nav__progress {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .timeline-nav__progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: width 100ms linear;
+  }
+</style>

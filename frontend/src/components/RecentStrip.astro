@@ -1,0 +1,136 @@
+---
+import type { Album } from "../lib/data";
+
+interface Props {
+  albums: Album[];
+}
+
+const { albums } = Astro.props;
+---
+
+<section class="recent-strip">
+  <p class="recent-strip__label">Recently Added</p>
+  <div class="recent-strip__scroll">
+    {albums.map((album) => (
+      <a href={`/albums/${album.slug}`} class="recent-item">
+        <div class="recent-item__thumb">
+          {album.cover_thumbnail || album.cover_image ? (
+            <img
+              src={album.cover_thumbnail || album.cover_image}
+              alt={album.exhibition_title || album.album_title}
+              loading="lazy"
+              decoding="async"
+              width="220"
+              height="147"
+            />
+          ) : (
+            <div class="recent-item__empty">No image</div>
+          )}
+        </div>
+        <h3 class="recent-item__title">
+          {album.exhibition_title || album.album_title}
+        </h3>
+        {album.venue && (
+          <p class="recent-item__venue">{album.venue}</p>
+        )}
+      </a>
+    ))}
+  </div>
+</section>
+
+<style>
+  .recent-strip {
+    padding: 3rem 0 4rem;
+  }
+
+  .recent-strip__label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .recent-strip__scroll {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0.5rem;
+  }
+
+  .recent-strip__scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .recent-item {
+    flex: 0 0 220px;
+    scroll-snap-align: start;
+    text-decoration: none;
+    color: var(--ink);
+    transition: transform 300ms var(--ease);
+  }
+
+  .recent-item:hover {
+    transform: translateY(-2px);
+    color: var(--ink);
+  }
+
+  .recent-item__thumb {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface-raised);
+    margin-bottom: 0.5rem;
+  }
+
+  .recent-item__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 500ms var(--ease);
+    filter: brightness(0.97) saturate(0.95);
+  }
+
+  .recent-item:hover .recent-item__thumb img {
+    transform: scale(1.04);
+    filter: brightness(1) saturate(1);
+  }
+
+  .recent-item__empty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-faint);
+    font-size: 0.75rem;
+    font-style: italic;
+    font-family: var(--font-display);
+  }
+
+  .recent-item__title {
+    font-family: var(--font-display);
+    font-size: 0.92rem;
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1.3;
+    margin-bottom: 0.15rem;
+    color: var(--ink);
+  }
+
+  .recent-item:hover .recent-item__title {
+    color: var(--accent);
+  }
+
+  .recent-item__venue {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    color: var(--ink-light);
+    line-height: 1.3;
+  }
+</style>

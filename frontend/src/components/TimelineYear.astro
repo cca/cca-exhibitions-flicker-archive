@@ -1,0 +1,84 @@
+---
+import type { Album } from "../lib/data";
+import TimelineGalleryCard from "./TimelineGalleryCard.astro";
+
+interface Props {
+  year: string;
+  albums: Album[];
+}
+
+const { year, albums } = Astro.props;
+---
+
+<section class="timeline-year" data-year={year} id={`year-${year}`}>
+  <div class="timeline-year__marker">
+    <span class="timeline-year__text">{year}</span>
+    <span class="timeline-year__count">{albums.length} exhibition{albums.length !== 1 ? "s" : ""}</span>
+  </div>
+  <div class="timeline-year__list">
+    {albums.map((album, i) => (
+      <TimelineGalleryCard album={album} index={i} />
+    ))}
+  </div>
+</section>
+
+<style>
+  /* ── Default: Gallery view (horizontal scroll, multi-image clusters) ── */
+  .timeline-year {
+    min-width: auto;
+    width: max-content;
+    padding: 1rem var(--page-gutter) 0.5rem;
+    display: flex;
+    flex-direction: column;
+    scroll-snap-align: start;
+    position: relative;
+  }
+
+  .timeline-year__marker {
+    position: sticky;
+    left: var(--page-gutter);
+    width: fit-content;
+    z-index: 10;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: baseline;
+    gap: 1.25rem;
+  }
+
+  .timeline-year__text {
+    font-family: var(--font-display);
+    font-size: 5rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink-faint);
+    opacity: 0.5;
+    letter-spacing: -0.03em;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .timeline-year__count {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
+    align-self: flex-end;
+    margin-bottom: 0.5rem;
+    display: none;
+  }
+
+  .timeline-year__list {
+    display: flex;
+    flex-direction: row;
+    gap: 3rem;
+    flex: 1;
+    padding-top: 1rem;
+    align-items: stretch;
+  }
+
+  @media (max-width: 768px) {
+    .timeline-year__text {
+      font-size: 3.5rem;
+    }
+  }
+</style>

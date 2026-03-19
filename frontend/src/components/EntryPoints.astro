@@ -1,0 +1,126 @@
+---
+import { getRandomAlbum } from "../lib/data";
+
+const randomAlbum = getRandomAlbum();
+const luckyHref = randomAlbum ? `/albums/${randomAlbum.slug}` : "/search";
+---
+
+<section class="entry-points">
+  <p class="entry-points__label">Ways In</p>
+  <div class="entry-points__grid">
+    <a href="/timeline" class="entry-card entry-card--wide">
+      <h3 class="entry-card__heading">A Decade of Making</h3>
+      <p class="entry-card__desc">Scroll through 10 years of exhibition history</p>
+    </a>
+    <a href="/slideshow" class="entry-card">
+      <h3 class="entry-card__heading">Serendipity Engine</h3>
+      <p class="entry-card__desc">Random exhibitions, full-screen immersion</p>
+    </a>
+    <a href="/search" class="entry-card">
+      <h3 class="entry-card__heading">The Full Archive</h3>
+      <p class="entry-card__desc">Search and filter every exhibition</p>
+    </a>
+  </div>
+  <div class="entry-points__lucky">
+    <a href={luckyHref} class="lucky-link">I'm feeling lucky</a>
+  </div>
+</section>
+
+<style>
+  .entry-points {
+    padding: 4rem 0;
+  }
+
+  .entry-points__label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+  }
+
+  .entry-points__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .entry-points__grid {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .entry-card--wide {
+      grid-row: 1 / 3;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+  }
+
+  .entry-card {
+    display: block;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: var(--radius-lg);
+    padding: 2rem 1.75rem;
+    text-decoration: none;
+    color: var(--ink);
+    transition: all 300ms var(--ease);
+    border-left: 3px solid transparent;
+  }
+
+  .entry-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    border-left-color: var(--accent);
+    color: var(--ink);
+  }
+
+  .entry-card:hover .entry-card__heading {
+    color: var(--accent);
+  }
+
+  .entry-card__heading {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+    color: var(--ink);
+    transition: color 300ms var(--ease);
+  }
+
+  .entry-card--wide .entry-card__heading {
+    font-size: 1.8rem;
+  }
+
+  .entry-card__desc {
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    color: var(--ink-light);
+    line-height: 1.5;
+  }
+
+  .entry-points__lucky {
+    margin-top: 1.25rem;
+    text-align: center;
+  }
+
+  .lucky-link {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    transition: color 200ms var(--ease);
+    border-bottom: 1px solid transparent;
+  }
+
+  .lucky-link:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+</style>

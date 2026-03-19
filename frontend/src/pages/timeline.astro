@@ -1,0 +1,150 @@
+---
+import Base from "../layouts/Base.astro";
+import TimelineNav from "../components/TimelineNav.astro";
+import TimelineYear from "../components/TimelineYear.astro";
+import { getAlbumsByYear } from "../lib/data";
+
+const albumsByYear = getAlbumsByYear();
+const yearEntries = [...albumsByYear.entries()];
+const years = yearEntries.map(([year]) => year);
+---
+
+<Base title="Timeline">
+  {yearEntries.length === 0 ? (
+    <div class="timeline-empty">
+      <p class="empty">No dated exhibitions found.</p>
+    </div>
+  ) : (
+    <div class="timeline-page">
+      <TimelineNav years={years} />
+      <div class="timeline-scroll" id="timeline-scroll">
+        {yearEntries.map(([year, albums]) => (
+          <TimelineYear year={year} albums={albums} />
+        ))}
+      </div>
+    </div>
+  )}
+</Base>
+
+<style>
+  .timeline-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+  }
+
+  .timeline-page {
+    /* Break out of the Base layout container to go full-width */
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    display: flex;
+    flex-direction: column;
+    /* Pull up into the header margin to tighten the gap */
+    margin-top: -1.5rem;
+    /* Fill remaining viewport: header ~3.5rem + reduced gap 1rem = 4.5rem */
+    height: calc(100dvh - 4.5rem);
+    /* Override site-main padding that wastes space below */
+    margin-bottom: -4rem;
+  }
+
+  .timeline-scroll {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .timeline-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+</style>
+
+<script>
+  function initTimeline() {
+    const container = document.getElementById("timeline-scroll");
+    const progressBar = document.getElementById("timeline-progress");
+    const navLinks = document.querySelectorAll<HTMLAnchorElement>("[data-nav-year]");
+    const yearSections = document.querySelectorAll<HTMLElement>("[data-year]");
+
+    if (!container || yearSections.length === 0) return;
+
+    // Wheel → horizontal scroll translation
+    container.addEventListener(
+      "wheel",
+      (e: WheelEvent) => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          e.preventDefault();
+          container.scrollLeft += e.deltaY;
+        }
+      },
+      { passive: false }
+    );
+
+    // Update progress bar on scroll
+    container.addEventListener("scroll", () => {
+      if (!progressBar) return;
+      const maxScroll = container.scrollWidth - container.clientWidth;
+      const progress = maxScroll <= 0 ? 100 : (container.scrollLeft / maxScroll) * 100;
+      progressBar.style.width = `${progress}%`;
+    });
+
+    // IntersectionObserver to detect active year
+    // Use a thin strip on the left edge of the container so even very wide
+    // year sections trigger as soon as they scroll into the leading edge.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const year = (entry.target as HTMLElement).dataset.year;
+            if (!year) continue;
+
+            navLinks.forEach((link) => {
+              if (link.dataset.navYear === year) {
+                link.classList.add("is-active");
+                link.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+              } else {
+                link.classList.remove("is-active");
+              }
+            });
+          }
+        }
+      },
+      {
+        root: container,
+        // Shrink the observation zone to a narrow vertical strip on the left
+        // so only the section currently at the leading edge is "active".
+        rootMargin: "0px -80% 0px 0px",
+        threshold: 0,
+      }
+    );
+
+    yearSections.forEach((section) => observer.observe(section));
+
+    // Nav link clicks → smooth scroll to year section
+    navLinks.forEach((link) => {
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        const year = link.dataset.navYear;
+        if (!year) return;
+        const target = document.getElementById(`year-${year}`);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+        }
+      });
+    });
+  }
+
+  // Run on page load and Astro page transitions
+  document.addEventListener("astro:page-load", initTimeline);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initTimeline);
+  } else {
+    initTimeline();
+  }
+</script>

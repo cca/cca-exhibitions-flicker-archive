@@ -1,0 +1,200 @@
+---
+import type { Album } from "../lib/data";
+
+interface Props {
+  album: Album;
+  index?: number;
+}
+
+const { album, index = 0 } = Astro.props;
+
+const title = album.exhibition_title || album.album_title;
+const delay = `${index * 120}ms`;
+
+// Show up to 5 photos — compact collage per exhibition
+const visiblePhotos = album.photos.filter((p) => p.image_src).slice(0, 5);
+const totalCount = album.photos.length;
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
+const formattedDate = formatDate(album.opening_date);
+---
+
+<div class="cluster" style={`--delay: ${delay}`}>
+  <div class="cluster__info">
+    <a href={`/albums/${album.slug}`} class="cluster__title">{title}</a>
+    {album.venue && <p class="cluster__venue">{album.venue}</p>}
+    {album.artists.length > 0 && (
+      <p class="cluster__artists">{album.artists.slice(0, 3).join(", ")}</p>
+    )}
+    <div class="cluster__meta">
+      {formattedDate && <span class="cluster__date">{formattedDate}</span>}
+      <span class="cluster__count">{totalCount} photos</span>
+    </div>
+  </div>
+  <div class="cluster__photos">
+    {visiblePhotos.map((photo, i) => (
+      <a href={`/albums/${album.slug}`} class="cluster__img" style={`--i: ${i}`}>
+        <img
+          src={photo.thumbnail_src || photo.image_src}
+          alt={photo.photo_title || "Exhibition photo"}
+          loading="lazy"
+          decoding="async"
+        />
+      </a>
+    ))}
+  </div>
+</div>
+
+<style>
+  .cluster {
+    width: clamp(320px, 28vw, 440px);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 500ms var(--ease-out) both;
+    animation-delay: var(--delay, 0ms);
+  }
+
+  /* Info label — no card surface, just text */
+  .cluster__info {
+    margin-bottom: 0.75rem;
+  }
+
+  .cluster__title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 400;
+    line-height: 1.25;
+    color: var(--ink);
+    text-decoration: none;
+    display: block;
+    margin-bottom: 0.25rem;
+    transition: color 300ms var(--ease);
+  }
+
+  .cluster__title:hover {
+    color: var(--accent);
+  }
+
+  .cluster__venue {
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    color: var(--ink-light);
+    line-height: 1.35;
+    margin-bottom: 0.1rem;
+  }
+
+  .cluster__artists {
+    font-family: var(--font-body);
+    font-size: 0.74rem;
+    color: var(--ink-light);
+    line-height: 1.35;
+  }
+
+  .cluster__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.4rem;
+  }
+
+  .cluster__date {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+  }
+
+  .cluster__count {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--ink-faint);
+  }
+
+  /* Photo grid */
+  .cluster__photos {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: clamp(120px, 16vh, 200px);
+    gap: 8px;
+  }
+
+  /* Photo cells */
+  .cluster__img {
+    display: block;
+    overflow: hidden;
+    border-radius: 3px;
+    box-shadow:
+      0 1px 4px rgba(0, 0, 0, 0.07),
+      0 4px 14px rgba(0, 0, 0, 0.05);
+    transform: rotate(calc((var(--i) - 2) * 0.7deg));
+    transition:
+      transform 400ms var(--ease-out),
+      box-shadow 400ms var(--ease-out);
+  }
+
+  .cluster__img:hover {
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.12),
+      0 8px 28px rgba(0, 0, 0, 0.1);
+    transform: rotate(0deg) scale(1.03);
+    z-index: 3;
+  }
+
+  .cluster__img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: brightness(0.97) saturate(0.94);
+    transition: filter 400ms var(--ease);
+  }
+
+  .cluster__img:hover img {
+    filter: brightness(1.02) saturate(1);
+  }
+
+  /* Hero — first photo spans 2 cols */
+  .cluster__img:nth-child(1) {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+
+  /* Mobile: 2-col grid, bigger clusters */
+  @media (max-width: 768px) {
+    .cluster {
+      width: clamp(280px, 82vw, 360px);
+    }
+
+    .cluster__title {
+      font-size: 1.1rem;
+    }
+
+    .cluster__venue {
+      font-size: 0.85rem;
+    }
+
+    .cluster__artists {
+      font-size: 0.8rem;
+    }
+
+    .cluster__photos {
+      grid-template-columns: repeat(2, 1fr);
+      grid-auto-rows: clamp(100px, 14vh, 150px);
+      gap: 6px;
+    }
+
+    /* Hero spans full width instead of 2-of-3 */
+    .cluster__img:nth-child(1) {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

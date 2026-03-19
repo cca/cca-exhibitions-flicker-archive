@@ -1,0 +1,499 @@
+---
+import Base from "../layouts/Base.astro";
+import FilterBar from "../components/FilterBar.astro";
+import { getAllAlbums } from "../lib/data";
+
+const albums = getAllAlbums();
+---
+
+<Base title="Search">
+  <div class="search-header">
+    <div class="search-header__top">
+      <h1 class="search-title">Search the Archive</h1>
+      <span class="search-count">{albums.length} exhibitions catalogued</span>
+    </div>
+    <p class="search-lead">
+      Browse and filter exhibitions by title, artist, venue, or year.
+    </p>
+  </div>
+
+  <FilterBar albums={albums} />
+
+  {
+    albums.length > 0 ? (
+      <div class="album-list" id="album-grid">
+        {albums.map((album, i) => {
+          const year = (() => {
+            const date = album.opening_date || album.album_date_created;
+            if (!date) return "";
+            return String(new Date(date).getFullYear());
+          })();
+          const dateRange =
+            album.opening_date && album.closing_date
+              ? `${album.opening_date} — ${album.closing_date}`
+              : album.opening_date || album.closing_date || "";
+          return (
+            <div
+              class="card-wrapper"
+              data-title={(album.exhibition_title || album.album_title || "").toLowerCase()}
+              data-venue={(album.venue || "").toLowerCase()}
+              data-year={year}
+              data-medium={(album.medium || "").toLowerCase()}
+              data-artists={(album.artists || []).join("; ").toLowerCase()}
+              style={`--stagger: ${Math.min(i, 20)}`}
+            >
+              <a href={`/albums/${album.slug}`} class="row">
+                <span class="row__index">{String(i + 1).padStart(3, '0')}</span>
+                <div class="row__frame">
+                  {album.cover_image ? (
+                    <img
+                      src={album.cover_thumbnail || album.cover_image}
+                      alt={album.exhibition_title || album.album_title}
+                      loading="lazy"
+                      decoding="async"
+                      width="360"
+                      height="240"
+                    />
+                  ) : (
+                    <div class="row__empty">
+                      <span>No image</span>
+                    </div>
+                  )}
+                </div>
+                <div class="row__text">
+                  <h2 class="row__title">{album.exhibition_title || album.album_title}</h2>
+                  {album.artists.length > 0 && (
+                    <p class="row__artists">{album.artists.join(", ")}</p>
+                  )}
+                  <div class="row__meta-stack">
+                    {album.venue && <span class="row__venue">{album.venue}</span>}
+                    {dateRange && <span class="row__date">{dateRange}</span>}
+                  </div>
+                </div>
+                <div class="row__end">
+                  <span class="row__photo-count">{album.photos.length}</span>
+                  <span class="row__photo-label">photos</span>
+                  <svg class="row__arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </a>
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <p>No albums found.</p>
+        <p class="empty-hint">
+          Run the archive pipeline to generate CSV data in <code>output/csv/</code>
+        </p>
+      </div>
+    )
+  }
+
+  <div id="no-results" class="no-results" style="display: none;">
+    <div class="no-results__inner">
+      <svg class="no-results__icon" width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <circle cx="13" cy="13" r="10" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M21 21L30 30" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M9 13h8M13 9v8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+      </svg>
+      <p class="no-results__text">No exhibitions match your filters.</p>
+      <p class="no-results__hint">Try broadening your search or clearing a filter.</p>
+    </div>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('filter-search') as HTMLInputElement;
+    const venueSelect = document.getElementById('filter-venue') as HTMLSelectElement;
+    const yearSelect = document.getElementById('filter-year') as HTMLSelectElement;
+    const grid = document.getElementById('album-grid');
+    const noResults = document.getElementById('no-results');
+    const countEl = document.getElementById('filter-count');
+
+    if (searchInput && venueSelect && yearSelect && grid && noResults) {
+      const cards = grid.querySelectorAll<HTMLElement>('.card-wrapper');
+
+      function applyFilters() {
+        const search = searchInput.value.toLowerCase().trim();
+        const venue = venueSelect.value.toLowerCase();
+        const year = yearSelect.value;
+
+        let visibleCount = 0;
+
+        cards.forEach((card) => {
+          const title = card.dataset.title || '';
+          const cardVenue = card.dataset.venue || '';
+          const cardYear = card.dataset.year || '';
+          const artists = card.dataset.artists || '';
+
+          const matchesSearch =
+            !search ||
+            title.includes(search) ||
+            cardVenue.includes(search) ||
+            artists.includes(search);
+
+          const matchesVenue = !venue || cardVenue === venue;
+          const matchesYear = !year || cardYear === year;
+
+          if (matchesSearch && matchesVenue && matchesYear) {
+            card.style.display = '';
+            visibleCount++;
+          } else {
+            card.style.display = 'none';
+          }
+        });
+
+        noResults.style.display = visibleCount === 0 ? '' : 'none';
+
+        if (countEl) {
+          countEl.textContent = `${visibleCount} result${visibleCount !== 1 ? 's' : ''}`;
+        }
+      }
+
+      searchInput.addEventListener('input', applyFilters);
+      venueSelect.addEventListener('input', applyFilters);
+      yearSelect.addEventListener('input', applyFilters);
+    }
+  </script>
+</Base>
+
+<style>
+  /* ─── Header ─── */
+  .search-header {
+    margin-bottom: 2.5rem;
+  }
+
+  .search-header__top {
+    display: flex;
+    align-items: baseline;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+
+  .search-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
+    color: var(--ink);
+  }
+
+  .search-count {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    position: relative;
+    top: -0.15em;
+  }
+
+  .search-lead {
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    color: var(--ink-light);
+    line-height: 1.5;
+    max-width: 36rem;
+  }
+
+  /* ─── Album List ─── */
+  .album-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-wrapper {
+    min-width: 0;
+    animation: revealRow 500ms var(--ease-out) both;
+    animation-delay: calc(var(--stagger, 0) * 30ms);
+  }
+
+  @keyframes revealRow {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ─── Row ─── */
+  .row {
+    display: grid;
+    grid-template-columns: 2.5rem 200px 1fr auto;
+    gap: 1.5rem;
+    align-items: center;
+    padding: 1.1rem 0;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border);
+    transition: background 200ms var(--ease);
+    margin: 0 -0.75rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    border-radius: var(--radius);
+  }
+
+  .row:hover {
+    background: var(--surface);
+  }
+
+  /* ─── Index number ─── */
+  .row__index {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.04em;
+    user-select: none;
+    transition: color 200ms var(--ease);
+  }
+
+  .row:hover .row__index {
+    color: var(--accent);
+  }
+
+  /* ─── Frame ─── */
+  .row__frame {
+    width: 200px;
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    border-radius: var(--radius);
+    flex-shrink: 0;
+    background: var(--surface-raised);
+  }
+
+  .row__frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.88;
+    transition: opacity 400ms var(--ease), transform 600ms var(--ease);
+  }
+
+  .row:hover .row__frame img {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+
+  .row__empty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-faint);
+    font-size: 0.7rem;
+    font-style: italic;
+    font-family: var(--font-display);
+  }
+
+  /* ─── Text ─── */
+  .row__text {
+    min-width: 0;
+  }
+
+  .row__title {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1.25;
+    color: var(--ink);
+    margin-bottom: 0.25rem;
+    transition: color 200ms var(--ease);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .row:hover .row__title {
+    color: var(--accent);
+  }
+
+  .row__artists {
+    font-size: 0.82rem;
+    color: var(--ink);
+    margin-bottom: 0.35rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .row__meta-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .row__venue {
+    font-size: 0.75rem;
+    color: var(--ink-light);
+    line-height: 1.3;
+  }
+
+  .row__date {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    color: var(--ink-faint);
+    letter-spacing: -0.01em;
+  }
+
+  /* ─── End column ─── */
+  .row__end {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05rem;
+    min-width: 3.5rem;
+    padding-right: 0.25rem;
+  }
+
+  .row__photo-count {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--ink-light);
+    line-height: 1;
+    transition: color 200ms var(--ease);
+  }
+
+  .row:hover .row__photo-count {
+    color: var(--accent);
+  }
+
+  .row__photo-label {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .row__arrow {
+    color: var(--ink-faint);
+    margin-top: 0.35rem;
+    opacity: 0;
+    transform: translateX(-3px);
+    transition: opacity 200ms var(--ease), transform 200ms var(--ease), color 200ms var(--ease);
+  }
+
+  .row:hover .row__arrow {
+    opacity: 1;
+    transform: translateX(0);
+    color: var(--accent);
+  }
+
+  /* ─── No Results ─── */
+  .no-results {
+    padding: 5rem 2rem;
+  }
+
+  .no-results__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .no-results__icon {
+    color: var(--ink-faint);
+    opacity: 0.5;
+    margin-bottom: 0.25rem;
+  }
+
+  .no-results__text {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.15rem;
+    color: var(--ink-light);
+  }
+
+  .no-results__hint {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    color: var(--ink-faint);
+  }
+
+  /* ─── Empty State ─── */
+  .empty-state {
+    padding: 5rem 2rem;
+    text-align: center;
+  }
+
+  .empty-state p {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--ink-light);
+  }
+
+  .empty-hint {
+    margin-top: 0.5rem;
+    font-family: var(--font-body) !important;
+    font-style: normal !important;
+    font-size: 0.85rem !important;
+    color: var(--ink-faint) !important;
+  }
+
+  .empty-hint code {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: 0.82em;
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 900px) {
+    .row {
+      grid-template-columns: 160px 1fr;
+      gap: 1rem;
+    }
+
+    .row__index {
+      display: none;
+    }
+
+    .row__end {
+      display: none;
+    }
+
+    .row__frame {
+      width: 160px;
+    }
+  }
+
+  @media (max-width: 540px) {
+    .search-header__top {
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .row {
+      grid-template-columns: 100px 1fr;
+      gap: 0.75rem;
+      padding: 0.9rem 0.5rem;
+      margin: 0 -0.5rem;
+    }
+
+    .row__frame {
+      width: 100px;
+    }
+
+    .row__title {
+      font-size: 1.05rem;
+    }
+
+    .row__artists {
+      font-size: 0.78rem;
+    }
+  }
+</style>

@@ -1,0 +1,616 @@
+---
+import Immersive from "../layouts/Immersive.astro";
+import { getAllAlbums, getRandomAlbum } from "../lib/data";
+
+const albums = getAllAlbums();
+const albumIndex = albums.map((a) => ({
+  slug: a.slug,
+  exhibition_title: a.exhibition_title,
+  venue: a.venue,
+}));
+
+const initial = getRandomAlbum();
+const initialData = initial
+  ? {
+      slug: initial.slug,
+      exhibition_title: initial.exhibition_title,
+      venue: initial.venue,
+      opening_date: initial.opening_date,
+      artists: initial.artists,
+      photos: initial.photos.map((p) => ({
+        photo_id: p.photo_id,
+        image_src: p.image_src,
+        photo_title: p.photo_title,
+      })),
+    }
+  : null;
+---
+
+<Immersive title="Slideshow">
+  <div id="shuffle-app" class="shuffle">
+    <!-- Loading state -->
+    <div id="shuffle-loading" class="shuffle__loading">
+      <span class="shuffle__loading-text">Loading&hellip;</span>
+    </div>
+
+    <!-- Image layers for crossfade -->
+    <img id="img-layer-a" class="shuffle__image shuffle__image--active" alt="" />
+    <img id="img-layer-b" class="shuffle__image" alt="" />
+
+    <!-- Gradient overlay for text readability -->
+    <div class="shuffle__gradient"></div>
+
+    <!-- Fade-to-black overlay for shuffle transitions -->
+    <div id="shuffle-fade" class="shuffle__fade"></div>
+
+    <!-- Top-right: Shuffle button -->
+    <button id="btn-shuffle" class="shuffle__btn-shuffle" type="button">
+      Shuffle
+    </button>
+
+    <!-- Bottom-left: Exhibition info -->
+    <div class="shuffle__info">
+      <h1 id="exhibition-title" class="shuffle__title"></h1>
+      <p id="exhibition-venue" class="shuffle__venue"></p>
+      <a id="exhibition-link" class="shuffle__link" href="#">View exhibition &rarr;</a>
+    </div>
+
+    <!-- Bottom-center: Pause/play -->
+    <button id="btn-pause" class="shuffle__btn-pause" type="button" aria-label="Pause auto-advance">
+      <span id="pause-icon">&#10074;&#10074;</span>
+    </button>
+
+    <!-- Bottom-right: Photo counter -->
+    <span id="photo-counter" class="shuffle__counter"></span>
+  </div>
+</Immersive>
+
+<style>
+  .shuffle {
+    position: fixed;
+    inset: 0;
+    background: var(--immersive);
+    user-select: none;
+    cursor: default;
+  }
+
+  /* ── Loading ── */
+  .shuffle__loading {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    background: var(--immersive);
+    transition: opacity 500ms var(--ease);
+  }
+
+  .shuffle__loading.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .shuffle__loading-text {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.4);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  /* ── Images ── */
+  .shuffle__image {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 800ms ease;
+    z-index: 1;
+  }
+
+  .shuffle__image--active {
+    opacity: 1;
+  }
+
+  /* ── Gradient overlay ── */
+  .shuffle__gradient {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background:
+      linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.65) 0%,
+        rgba(0, 0, 0, 0.25) 25%,
+        transparent 50%
+      ),
+      linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.3) 0%,
+        transparent 15%
+      );
+  }
+
+  /* ── Fade-to-black overlay ── */
+  .shuffle__fade {
+    position: fixed;
+    inset: 0;
+    background: var(--immersive);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 400ms ease;
+    z-index: 15;
+  }
+
+  .shuffle__fade.is-active {
+    opacity: 1;
+  }
+
+  /* ── Shuffle button ── */
+  .shuffle__btn-shuffle {
+    position: fixed;
+    top: 1.25rem;
+    right: clamp(1rem, 3vw, 2rem);
+    z-index: 10;
+    padding: 0.5em 1.2em;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: transparent;
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: border-color 200ms var(--ease), color 200ms var(--ease);
+  }
+
+  .shuffle__btn-shuffle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Exhibition info ── */
+  .shuffle__info {
+    position: fixed;
+    bottom: clamp(1.5rem, 4vw, 3rem);
+    left: clamp(1rem, 3vw, 2rem);
+    z-index: 10;
+    max-width: 60vw;
+  }
+
+  .shuffle__title {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4vw, 3rem);
+    font-weight: 700;
+    line-height: 1.1;
+    color: #fff;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.3);
+    margin: 0;
+  }
+
+  .shuffle__venue {
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 0.35em;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .shuffle__link {
+    display: inline-block;
+    margin-top: 0.6em;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.45);
+    text-decoration: none;
+    transition: color 200ms var(--ease);
+    opacity: 0;
+    transition: opacity 300ms var(--ease), color 200ms var(--ease);
+  }
+
+  .shuffle:hover .shuffle__link {
+    opacity: 1;
+  }
+
+  .shuffle__link:hover {
+    color: var(--accent);
+  }
+
+  /* ── Pause/play button ── */
+  .shuffle__btn-pause {
+    position: fixed;
+    bottom: clamp(1.5rem, 4vw, 3rem);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    padding: 0.35em 0.7em;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.4);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: border-color 200ms var(--ease), color 200ms var(--ease);
+    border-radius: 2px;
+  }
+
+  .shuffle__btn-pause:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* ── Photo counter ── */
+  .shuffle__counter {
+    position: fixed;
+    bottom: clamp(1.5rem, 4vw, 3rem);
+    right: clamp(1rem, 3vw, 2rem);
+    z-index: 10;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .shuffle__info {
+      max-width: 80vw;
+    }
+
+    .shuffle__btn-pause {
+      bottom: auto;
+      top: 1.25rem;
+      left: 50%;
+    }
+  }
+</style>
+
+<script is:inline define:vars={{ albumIndex, initialData }}>
+  (function () {
+    // ── State ──
+    const state = {
+      albumList: albumIndex,
+      currentAlbum: null,
+      currentPhotoIndex: 0,
+      autoAdvanceTimer: null,
+      isPaused: false,
+      isTransitioning: false,
+    };
+
+    const AUTO_ADVANCE_MS = 8000;
+
+    // ── DOM refs ──
+    const app = document.getElementById("shuffle-app");
+    const loading = document.getElementById("shuffle-loading");
+    const imgA = document.getElementById("img-layer-a");
+    const imgB = document.getElementById("img-layer-b");
+    const fadeOverlay = document.getElementById("shuffle-fade");
+    const titleEl = document.getElementById("exhibition-title");
+    const venueEl = document.getElementById("exhibition-venue");
+    const linkEl = document.getElementById("exhibition-link");
+    const counterEl = document.getElementById("photo-counter");
+    const btnShuffle = document.getElementById("btn-shuffle");
+    const btnPause = document.getElementById("btn-pause");
+    const pauseIcon = document.getElementById("pause-icon");
+
+    // Track which layer is currently active (true = A, false = B)
+    let layerAActive = true;
+
+    // ── Helpers ──
+
+    function pickRandomAlbumSlug(excludeSlug) {
+      if (state.albumList.length === 0) return null;
+      if (state.albumList.length === 1) return state.albumList[0];
+      const candidates = excludeSlug
+        ? state.albumList.filter((a) => a.slug !== excludeSlug)
+        : state.albumList;
+      if (candidates.length === 0) return state.albumList[0];
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    async function fetchAlbumData(slug) {
+      const resp = await fetch(`/data/${slug}.json`);
+      if (!resp.ok) throw new Error(`Failed to fetch album: ${slug}`);
+      return resp.json();
+    }
+
+    function updateUI() {
+      const album = state.currentAlbum;
+      if (!album) return;
+
+      titleEl.textContent = album.exhibition_title || "Untitled Exhibition";
+      venueEl.textContent = album.venue || "";
+      linkEl.href = `/albums/${album.slug}`;
+
+      const total = album.photos.length;
+      if (total > 0) {
+        counterEl.textContent = `${state.currentPhotoIndex + 1} / ${total}`;
+      } else {
+        counterEl.textContent = "";
+      }
+    }
+
+    function showPhoto(index) {
+      const album = state.currentAlbum;
+      if (!album || album.photos.length === 0) return;
+
+      state.currentPhotoIndex = index;
+      const photo = album.photos[index];
+      const src = photo.image_src;
+
+      if (!src) {
+        // Skip photos with no image source
+        nextPhoto();
+        return;
+      }
+
+      // Crossfade: load into inactive layer, then swap
+      const incomingLayer = layerAActive ? imgB : imgA;
+      const outgoingLayer = layerAActive ? imgA : imgB;
+
+      incomingLayer.onload = function () {
+        incomingLayer.classList.add("shuffle__image--active");
+        outgoingLayer.classList.remove("shuffle__image--active");
+        layerAActive = !layerAActive;
+        updateUI();
+      };
+
+      incomingLayer.onerror = function () {
+        // If image fails to load, skip to next
+        updateUI();
+      };
+
+      incomingLayer.src = src;
+      incomingLayer.alt = photo.photo_title || "";
+    }
+
+    function nextPhoto() {
+      if (state.isTransitioning) return;
+      const album = state.currentAlbum;
+      if (!album || album.photos.length === 0) return;
+
+      const nextIndex = state.currentPhotoIndex + 1;
+      if (nextIndex >= album.photos.length) {
+        // Last photo: auto-shuffle to new album
+        shuffleNewAlbum();
+      } else {
+        showPhoto(nextIndex);
+      }
+      resetAutoAdvance();
+    }
+
+    function prevPhoto() {
+      if (state.isTransitioning) return;
+      const album = state.currentAlbum;
+      if (!album || album.photos.length === 0) return;
+
+      const prevIndex =
+        state.currentPhotoIndex - 1 < 0
+          ? album.photos.length - 1
+          : state.currentPhotoIndex - 1;
+      showPhoto(prevIndex);
+      resetAutoAdvance();
+    }
+
+    // ── Auto-advance ──
+
+    function startAutoAdvance() {
+      stopAutoAdvance();
+      if (state.isPaused) return;
+      state.autoAdvanceTimer = setInterval(function () {
+        if (!state.isPaused && !state.isTransitioning) {
+          nextPhoto();
+        }
+      }, AUTO_ADVANCE_MS);
+    }
+
+    function stopAutoAdvance() {
+      if (state.autoAdvanceTimer) {
+        clearInterval(state.autoAdvanceTimer);
+        state.autoAdvanceTimer = null;
+      }
+    }
+
+    function resetAutoAdvance() {
+      stopAutoAdvance();
+      startAutoAdvance();
+    }
+
+    function togglePause() {
+      state.isPaused = !state.isPaused;
+      pauseIcon.innerHTML = state.isPaused ? "&#9654;" : "&#10074;&#10074;";
+      if (state.isPaused) {
+        stopAutoAdvance();
+      } else {
+        startAutoAdvance();
+      }
+    }
+
+    // ── Shuffle ──
+
+    async function shuffleNewAlbum() {
+      if (state.isTransitioning) return;
+      if (state.albumList.length === 0) return;
+
+      state.isTransitioning = true;
+      stopAutoAdvance();
+
+      // Fade to black
+      fadeOverlay.classList.add("is-active");
+
+      await new Promise(function (resolve) {
+        setTimeout(resolve, 450);
+      });
+
+      // Pick new album
+      const currentSlug = state.currentAlbum ? state.currentAlbum.slug : null;
+      const next = pickRandomAlbumSlug(currentSlug);
+      if (!next) {
+        state.isTransitioning = false;
+        fadeOverlay.classList.remove("is-active");
+        startAutoAdvance();
+        return;
+      }
+
+      try {
+        const data = await fetchAlbumData(next.slug);
+        state.currentAlbum = data;
+        state.currentPhotoIndex = 0;
+        updateUI();
+
+        if (data.photos.length > 0) {
+          // Preload the first image before fading in
+          const firstSrc = data.photos[0].image_src;
+          if (firstSrc) {
+            const activeLayer = layerAActive ? imgA : imgB;
+            await new Promise(function (resolve) {
+              activeLayer.onload = resolve;
+              activeLayer.onerror = resolve;
+              activeLayer.src = firstSrc;
+              activeLayer.alt = data.photos[0].photo_title || "";
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load album:", err);
+      }
+
+      // Fade from black
+      fadeOverlay.classList.remove("is-active");
+      state.isTransitioning = false;
+      startAutoAdvance();
+    }
+
+    // ── Load initial album ──
+
+    async function init() {
+      if (!state.albumList || state.albumList.length === 0) {
+        titleEl.textContent = "No exhibitions available";
+        loading.classList.add("is-hidden");
+        return;
+      }
+
+      try {
+        let data;
+        if (initialData && initialData.photos && initialData.photos.length > 0) {
+          data = initialData;
+        } else {
+          const pick = pickRandomAlbumSlug(null);
+          data = await fetchAlbumData(pick.slug);
+        }
+
+        state.currentAlbum = data;
+        state.currentPhotoIndex = 0;
+        updateUI();
+
+        if (data.photos.length > 0) {
+          const firstSrc = data.photos[0].image_src;
+          if (firstSrc) {
+            await new Promise(function (resolve) {
+              imgA.onload = resolve;
+              imgA.onerror = resolve;
+              imgA.src = firstSrc;
+              imgA.alt = data.photos[0].photo_title || "";
+            });
+            imgA.classList.add("shuffle__image--active");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to initialize:", err);
+        titleEl.textContent = "Failed to load exhibition";
+      }
+
+      loading.classList.add("is-hidden");
+      startAutoAdvance();
+    }
+
+    // ── Event listeners ──
+
+    // Keyboard
+    document.addEventListener("keydown", function (e) {
+      switch (e.key) {
+        case "ArrowRight":
+          e.preventDefault();
+          nextPhoto();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          prevPhoto();
+          break;
+        case "s":
+        case "S":
+          e.preventDefault();
+          shuffleNewAlbum();
+          break;
+        case " ":
+          e.preventDefault();
+          togglePause();
+          break;
+        case "Escape":
+          window.location.href = "/search";
+          break;
+        case "Enter":
+        case "i":
+        case "I":
+          if (state.currentAlbum) {
+            window.location.href = `/albums/${state.currentAlbum.slug}`;
+          }
+          break;
+      }
+    });
+
+    // Buttons
+    btnShuffle.addEventListener("click", function () {
+      shuffleNewAlbum();
+    });
+
+    btnPause.addEventListener("click", function () {
+      togglePause();
+    });
+
+    // Touch/swipe support
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const SWIPE_THRESHOLD = 50;
+
+    app.addEventListener(
+      "touchstart",
+      function (e) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      },
+      { passive: true }
+    );
+
+    app.addEventListener(
+      "touchend",
+      function (e) {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+
+        // Only handle horizontal swipes (ignore vertical scrolls)
+        if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+          if (dx < 0) {
+            // Swipe left → next
+            nextPhoto();
+          } else {
+            // Swipe right → prev
+            prevPhoto();
+          }
+        }
+      },
+      { passive: true }
+    );
+
+    // Initialize
+    init();
+  })();
+</script>
+</Immersive>

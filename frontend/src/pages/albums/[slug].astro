@@ -49,7 +49,13 @@ const dateRange =
 
 <Base title={album.exhibition_title || album.album_title}>
   <div class="album-header">
-    <a href="/" class="back-link">&larr; All exhibitions</a>
+    <nav class="breadcrumb">
+      <a href="/" class="breadcrumb__link">Home</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/search" class="breadcrumb__link">Search</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__current">{album.exhibition_title || album.album_title}</span>
+    </nav>
     <h1 class="album-title">{album.exhibition_title || album.album_title}</h1>
     <div class="album-byline">
       {album.venue && <span class="byline-venue">{album.venue}</span>}
@@ -61,6 +67,14 @@ const dateRange =
       )
     }
   </div>
+
+  <section class="section">
+    <div class="section-label">
+      <span class="section-label__text">Photographs</span>
+      <span class="section-label__line"></span>
+    </div>
+    <PhotoGrid photos={album.photos} albumSlug={album.slug} />
+  </section>
 
   <section class="section">
     <div class="section-label">
@@ -81,14 +95,6 @@ const dateRange =
       </section>
     )
   }
-
-  <section class="section">
-    <div class="section-label">
-      <span class="section-label__text">Photographs</span>
-      <span class="section-label__line"></span>
-    </div>
-    <PhotoGrid photos={album.photos} albumSlug={album.slug} />
-  </section>
 
   <script type="application/json" id="photo-data" set:html={JSON.stringify(album.photos)} />
 
@@ -224,27 +230,46 @@ const dateRange =
     margin-bottom: 3rem;
   }
 
-  .back-link {
-    display: inline-block;
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 1.25rem;
     font-family: var(--font-mono);
     font-size: 0.72rem;
-    color: var(--text-dim);
     letter-spacing: 0.03em;
-    margin-bottom: 1.25rem;
+  }
+
+  .breadcrumb__link {
+    color: var(--ink-faint);
     transition: color 200ms var(--ease);
   }
 
-  .back-link:hover {
+  .breadcrumb__link:hover {
     color: var(--accent);
+  }
+
+  .breadcrumb__sep {
+    color: var(--ink-faint);
+    opacity: 0.5;
+  }
+
+  .breadcrumb__current {
+    color: var(--ink-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 30ch;
   }
 
   .album-title {
     font-family: var(--font-display);
-    font-size: clamp(1.5rem, 4vw, 2.4rem);
+    font-size: clamp(1.8rem, 5vw, 3rem);
     font-weight: 400;
     font-style: italic;
     letter-spacing: -0.01em;
     line-height: 1.15;
+    color: var(--ink);
     margin-bottom: 0.5rem;
   }
 
@@ -258,17 +283,17 @@ const dateRange =
 
   .byline-venue {
     font-size: 0.88rem;
-    color: var(--text-secondary);
+    color: var(--ink-light);
   }
 
   .byline-date {
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--ink-faint);
   }
 
   .album-summary {
-    color: var(--text-secondary);
+    color: var(--ink-light);
     font-size: 0.92rem;
     max-width: 65ch;
     line-height: 1.6;
@@ -289,7 +314,7 @@ const dateRange =
   .section-label__text {
     font-family: var(--font-mono);
     font-size: 0.68rem;
-    color: var(--text-dim);
+    color: var(--ink-faint);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     white-space: nowrap;
@@ -298,17 +323,17 @@ const dateRange =
   .section-label__line {
     flex: 1;
     height: 1px;
-    background: var(--border);
+    background: rgba(0, 0, 0, 0.08);
   }
 
   .raw-desc {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
     border-radius: var(--radius);
     padding: 1.25rem;
     font-family: var(--font-mono);
     font-size: 0.78rem;
-    color: var(--text-secondary);
+    color: var(--ink-light);
     white-space: pre-wrap;
     word-break: break-word;
     line-height: 1.7;
@@ -324,11 +349,12 @@ const dateRange =
     font-size: 1.2rem;
     font-weight: 400;
     font-style: italic;
+    color: var(--ink);
     margin-bottom: 1rem;
   }
 
   .modal-fields {
-    border: 1px solid var(--border);
+    border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: var(--radius);
     overflow: hidden;
   }
@@ -340,13 +366,13 @@ const dateRange =
   }
 
   .modal-row + .modal-row {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
   }
 
   .modal-label {
     padding: 0.5rem 0.75rem;
-    color: var(--text-dim);
-    background: var(--surface-raised);
+    color: var(--ink-faint);
+    background: rgba(0, 0, 0, 0.02);
     font-family: var(--font-mono);
     font-size: 0.65rem;
     font-weight: 500;
@@ -363,6 +389,7 @@ const dateRange =
     flex-wrap: wrap;
     gap: 0.3rem;
     word-break: break-all;
+    color: var(--ink);
   }
 
   .modal-link {

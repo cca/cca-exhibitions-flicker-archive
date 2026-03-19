@@ -1,11 +1,6 @@
 ---
 import "../styles/global.css";
 
-interface Props {
-  title: string;
-}
-
-const { title } = Astro.props;
 const currentPath = Astro.url.pathname;
 
 const navLinks = [
@@ -30,51 +25,38 @@ function isActive(href: string): boolean {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" href="/fonts/lineto-brown-regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/lineto-brown-bold.woff2" as="font" type="font/woff2" crossorigin />
-    <title>{title} — CCA Exhibitions Archive</title>
+    <title>Menu — CCA Exhibitions Archive</title>
   </head>
   <body>
-    <header class="site-header">
-      <nav class="container site-nav">
+    <header class="menu-header">
+      <nav class="container menu-topbar">
         <a href="/" class="site-wordmark">
           <img src="/logo-cca-lettermark.svg" alt="CCA" class="wordmark-logo" />
           <span class="wordmark-divider"></span>
           <span class="wordmark-label">Exhibitions Archive</span>
         </a>
-        <div class="nav-links">
-          {navLinks.map((link) => (
-            <a
-              href={link.href}
-              class:list={["nav-link", { "nav-link--active": isActive(link.href) }]}
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
-        <a href="/menu" class="nav-menu-link">Menu</a>
+        <a href="javascript:history.back()" class="menu-close">Close</a>
       </nav>
     </header>
-    <main class="container site-main">
-      <slot />
+    <main class="menu-body">
+      <nav class="menu-links">
+        {navLinks.map((link) => (
+          <a href={link.href} class="menu-link">{link.label}</a>
+        ))}
+      </nav>
     </main>
-    <footer class="site-footer">
-      <div class="container footer-inner">
-        <img src="/logo-cca-dynamic.svg" alt="CCA" class="footer-mark" />
-        <p>California College of the Arts</p>
-      </div>
-    </footer>
   </body>
 </html>
 
 <style>
-  .site-header {
+  .menu-header {
     display: flex;
     align-items: center;
     min-height: 3.5rem;
-    margin-bottom: 2.5rem;
     border-bottom: 1px solid var(--border);
   }
 
-  .site-nav {
+  .menu-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -117,86 +99,46 @@ function isActive(href: string): boolean {
     line-height: 1;
   }
 
-  .nav-links {
+  .menu-close {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--ink-light);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    transition: color 200ms var(--ease);
+  }
+
+  .menu-close:hover {
+    color: var(--ink);
+  }
+
+  .menu-body {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    justify-content: center;
+    min-height: calc(100dvh - 3.5rem);
+    padding: 0 var(--page-pad);
   }
 
-  .nav-link {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--ink-light);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    text-decoration: none;
-    line-height: 1;
-    transition: color 200ms var(--ease);
-  }
-
-  .nav-link:hover {
-    color: var(--ink);
-  }
-
-  .nav-link--active {
-    color: var(--accent);
-  }
-
-  .nav-menu-link {
-    display: none;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--ink-light);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    text-decoration: none;
-    line-height: 1;
-    transition: color 200ms var(--ease);
-  }
-
-  .nav-menu-link:hover {
-    color: var(--ink);
-  }
-
-  @media (max-width: 640px) {
-    .nav-links {
-      display: none;
-    }
-    .nav-menu-link {
-      display: block;
-    }
-  }
-
-  .site-main {
-    min-height: calc(100dvh - 11rem);
-    padding-bottom: 4rem;
-    animation: fadeIn 600ms var(--ease-out) both;
-  }
-
-  .site-footer {
-    padding: 2rem 0;
-    border-top: 1px solid var(--border);
-  }
-
-  .footer-mark {
-    height: 1.8rem;
-    width: auto;
-  }
-
-  .footer-inner {
+  .menu-links {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: 2rem;
   }
 
-  .footer-inner p {
-    font-family: var(--font-body);
-    font-size: 0.72rem;
-    color: var(--ink-faint);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+  .menu-link {
+    font-family: var(--font-display);
+    font-size: clamp(2.2rem, 8vw, 3.5rem);
+    color: var(--ink);
+    text-decoration: none;
+    line-height: 1.1;
+    transition: color 200ms var(--ease);
+  }
+
+  .menu-link:hover {
+    color: var(--accent);
   }
 </style>

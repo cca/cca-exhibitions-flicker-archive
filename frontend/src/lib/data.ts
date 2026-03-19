@@ -179,3 +179,44 @@ export function getAllAlbums(): Album[] {
 export function getAlbumBySlug(slug: string): Album | undefined {
   return getAllAlbums().find((a) => a.slug === slug);
 }
+
+/** Group albums by academic year (Aug-Jul). Key format: "2023-24" */
+export function getAlbumsByYear(): Map<string, Album[]> {
+  const albums = getAllAlbums();
+  const map = new Map<string, Album[]>();
+  for (const album of albums) {
+    const date = album.opening_date || album.album_date_created;
+    if (!date) continue;
+    const d = new Date(date);
+    const month = d.getMonth(); // 0-indexed
+    const year = d.getFullYear();
+    // Academic year: Aug (7) through Jul (6)
+    // If month >= 7 (Aug), it's the start of academic year YEAR-(YEAR+1)
+    // If month < 7 (Jan-Jul), it's the end of academic year (YEAR-1)-YEAR
+    const startYear = month >= 7 ? year : year - 1;
+    const key = `${startYear}-${String(startYear + 1).slice(2)}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(album);
+  }
+  // Sort keys chronologically
+  return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+/** Return a random album */
+export function getRandomAlbum(): Album | undefined {
+  const albums = getAllAlbums();
+  if (albums.length === 0) return undefined;
+  return albums[Math.floor(Math.random() * albums.length)];
+}
+
+/** Return the N most recently created albums */
+export function getRecentAlbums(n: number): Album[] {
+  const albums = getAllAlbums();
+  return [...albums]
+    .sort((a, b) => {
+      const da = a.album_date_created || "";
+      const db = b.album_date_created || "";
+      return db.localeCompare(da);
+    })
+    .slice(0, n);
+}

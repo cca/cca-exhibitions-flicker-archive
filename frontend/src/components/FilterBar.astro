@@ -1,0 +1,196 @@
+---
+import type { Album } from "../lib/data";
+
+interface Props {
+  albums: Album[];
+}
+
+const { albums } = Astro.props;
+
+const venues = [...new Set(albums.map((a) => a.venue).filter(Boolean))].sort();
+
+const years = [
+  ...new Set(
+    albums
+      .map((a) => {
+        const date = a.opening_date || a.album_date_created;
+        if (!date) return null;
+        return new Date(date).getFullYear();
+      })
+      .filter((y): y is number => y !== null)
+  ),
+].sort((a, b) => b - a);
+---
+
+<div class="filter-bar">
+  <div class="filter-search-wrap">
+    <svg class="filter-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M10.5 10.5L15 15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+    <input
+      type="text"
+      id="filter-search"
+      class="filter-input"
+      placeholder="Search by title, artist, or venue..."
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <span class="filter-count" id="filter-count">{albums.length} results</span>
+  </div>
+  <div class="filter-controls">
+    <div class="filter-select-wrap">
+      <label class="filter-label" for="filter-venue">Venue</label>
+      <select id="filter-venue" class="filter-select">
+        <option value="">All</option>
+        {venues.map((v) => (
+          <option value={v}>{v}</option>
+        ))}
+      </select>
+    </div>
+    <div class="filter-select-wrap">
+      <label class="filter-label" for="filter-year">Year</label>
+      <select id="filter-year" class="filter-select">
+        <option value="">All</option>
+        {years.map((y) => (
+          <option value={String(y)}>{y}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+</div>
+
+<style>
+  .filter-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .filter-search-wrap {
+    flex: 1;
+    position: relative;
+  }
+
+  .filter-search-icon {
+    position: absolute;
+    left: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink-faint);
+    pointer-events: none;
+    transition: color 200ms var(--ease);
+  }
+
+  .filter-search-wrap:focus-within .filter-search-icon {
+    color: var(--accent);
+  }
+
+  .filter-input {
+    width: 100%;
+    padding: 0.75rem 7rem 0.75rem 2.6rem;
+    font-family: var(--font-body);
+    font-size: 0.92rem;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color 250ms var(--ease), box-shadow 250ms var(--ease), background 250ms var(--ease);
+  }
+
+  .filter-input::placeholder {
+    color: var(--ink-faint);
+    font-style: italic;
+    font-family: var(--font-display);
+    font-size: 0.88rem;
+  }
+
+  .filter-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-bg);
+    background: #fff;
+  }
+
+  .filter-count {
+    position: absolute;
+    right: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    transition: color 200ms var(--ease);
+  }
+
+  .filter-search-wrap:focus-within .filter-count {
+    color: var(--ink-light);
+  }
+
+  .filter-controls {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .filter-select-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .filter-label {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: var(--ink-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .filter-select {
+    padding: 0.55rem 2rem 0.55rem 0.7rem;
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B6B6B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    min-width: 6rem;
+    transition: border-color 250ms var(--ease), box-shadow 250ms var(--ease), background 250ms var(--ease);
+  }
+
+  .filter-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-bg);
+    background: #fff;
+  }
+
+  @media (max-width: 640px) {
+    .filter-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+
+    .filter-controls {
+      gap: 0.5rem;
+    }
+
+    .filter-select {
+      flex: 1;
+    }
+  }
+</style>

@@ -1,0 +1,236 @@
+---
+import type { Album } from "../lib/data";
+
+interface Props {
+  albums: Album[];
+}
+
+const { albums } = Astro.props;
+
+const heroAlbums = albums
+  .filter((a) => a.cover_image)
+  .slice(0, 6);
+
+const count = heroAlbums.length;
+const cycleDuration = count * 8;
+---
+
+{count > 0 && (
+  <section class="hero-carousel" style={`--slide-count: ${count}; --cycle: ${cycleDuration}s;`}>
+    <div class="hero-carousel__images">
+      {heroAlbums.map((album, i) => (
+        <div
+          class="hero-carousel__slide"
+        >
+          <img
+            src={album.cover_image}
+            alt={album.exhibition_title || album.album_title}
+            loading={i === 0 ? "eager" : "lazy"}
+            decoding="async"
+          />
+        </div>
+      ))}
+    </div>
+    <div class="hero-carousel__gradient"></div>
+    <div class="hero-carousel__content">
+      <div class="hero-carousel__titles">
+        {heroAlbums.map((album, i) => (
+          <div
+            class="hero-carousel__title-slide"
+            >
+            <h2 class="hero-carousel__title">
+              {album.exhibition_title || album.album_title}
+            </h2>
+            {album.venue && (
+              <p class="hero-carousel__venue">{album.venue}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+    <div class="hero-carousel__scroll-hint">
+      <div class="hero-carousel__scroll-line"></div>
+    </div>
+  </section>
+)}
+
+<style>
+  .hero-carousel {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    overflow: hidden;
+    background: var(--immersive);
+    margin-top: -2.5rem;
+    margin-bottom: 0;
+  }
+
+  .hero-carousel__images {
+    position: absolute;
+    inset: 0;
+  }
+
+  .hero-carousel__slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+  }
+
+  .hero-carousel__slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 8s ease-out;
+    transform: scale(1);
+  }
+
+  .hero-carousel__slide:first-child {
+    opacity: 1;
+  }
+
+  .hero-carousel__slide:first-child img {
+    transform: scale(1.06);
+  }
+
+  .hero-carousel__gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.7) 0%,
+      rgba(0, 0, 0, 0.25) 30%,
+      rgba(0, 0, 0, 0.05) 60%,
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .hero-carousel__content {
+    position: absolute;
+    bottom: 5rem;
+    left: clamp(1rem, 3vw, 2rem);
+    right: clamp(1rem, 3vw, 2rem);
+    z-index: 3;
+    max-width: var(--max-width);
+  }
+
+  .hero-carousel__titles {
+    position: relative;
+    min-height: 5rem;
+  }
+
+  .hero-carousel__title-slide {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    opacity: 0;
+    transition: opacity 1.2s ease-in-out;
+  }
+
+  .hero-carousel__title-slide:first-child {
+    opacity: 1;
+  }
+
+  .hero-carousel__title {
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 4vw, 3.2rem);
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1.15;
+    color: #fff;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.35rem;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .hero-carousel__venue {
+    font-family: var(--font-body);
+    font-size: clamp(0.85rem, 1.5vw, 1rem);
+    color: rgba(255, 255, 255, 0.75);
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  .hero-carousel__scroll-hint {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+  }
+
+  .hero-carousel__scroll-line {
+    width: 1px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.5);
+    animation: scrollBounce 2s ease-in-out infinite;
+  }
+
+  @keyframes scrollBounce {
+    0%, 100% { transform: translateY(0); opacity: 0.5; }
+    50% { transform: translateY(6px); opacity: 1; }
+  }
+
+  @media (max-width: 640px) {
+    .hero-carousel__content {
+      bottom: 4rem;
+    }
+
+    .hero-carousel__titles {
+      min-height: 4rem;
+    }
+  }
+</style>
+
+<script define:vars={{ count, cycleDuration }}>
+  // JS-based crossfade for reliable timing across all browsers
+  const carousel = document.querySelector('.hero-carousel');
+  if (carousel) {
+    const slides = carousel.querySelectorAll('.hero-carousel__slide');
+    const titles = carousel.querySelectorAll('.hero-carousel__title-slide');
+
+    if (slides.length > 1) {
+      // Remove CSS animations and control via JS
+      slides.forEach((s, i) => {
+        s.style.animation = 'none';
+        s.style.opacity = i === 0 ? '1' : '0';
+        s.style.transition = 'opacity 1.5s ease-in-out';
+        // Ken Burns via CSS
+        const img = s.querySelector('img');
+        if (img) {
+          img.style.animation = 'none';
+          img.style.transition = 'transform 8s ease-out';
+          img.style.transform = i === 0 ? 'scale(1.06)' : 'scale(1)';
+        }
+      });
+
+      titles.forEach((t, i) => {
+        t.style.animation = 'none';
+        t.style.opacity = i === 0 ? '1' : '0';
+        t.style.transition = 'opacity 1.2s ease-in-out';
+      });
+
+      let current = 0;
+
+      setInterval(() => {
+        const prev = current;
+        current = (current + 1) % slides.length;
+
+        slides[prev].style.opacity = '0';
+        const prevImg = slides[prev].querySelector('img');
+        if (prevImg) prevImg.style.transform = 'scale(1)';
+
+        slides[current].style.opacity = '1';
+        const curImg = slides[current].querySelector('img');
+        if (curImg) curImg.style.transform = 'scale(1.06)';
+
+        titles[prev].style.opacity = '0';
+        titles[current].style.opacity = '1';
+      }, 8000);
+    }
+  }
+</script>
