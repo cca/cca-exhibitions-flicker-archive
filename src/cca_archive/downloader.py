@@ -106,8 +106,8 @@ async def download_photos(
                                         delay = float(retry_after)
                                     else:
                                         delay = 4 * 2**attempt  # 4s, 8s, 16s, 32s
-                                    # Set shared backoff so ALL tasks wait
-                                    backoff_until = asyncio.get_event_loop().time() + delay
+                                    # Set shared backoff so ALL tasks wait (never shrink it)
+                                    backoff_until = max(backoff_until, asyncio.get_event_loop().time() + delay)
                                     _console.print(
                                         f"[yellow]429 rate-limited — all downloads pausing {delay:.0f}s[/yellow]"
                                     )
