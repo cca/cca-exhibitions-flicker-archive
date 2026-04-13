@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     flickr_api_secret: str
     flickr_user_id: str
 
-    llm_model: str = "anthropic:claude-sonnet-4-20250514"
+    llm_model: str = "openai:gpt-4o-mini"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
 
