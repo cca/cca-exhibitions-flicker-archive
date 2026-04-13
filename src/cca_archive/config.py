@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_api_key: str = ""
 
+    ia_access_key: str = ""
+    ia_secret_key: str = ""
+    ia_collection: str = "opensource_image"
+
+    gcs_bucket: str = ""
+    gcs_credentials_file: str = ""  # path to service account JSON; empty = ADC
+
     skip_llm: bool = False
     output_dir: Path = Path("output")
     download_concurrency: int = 3
@@ -41,6 +48,10 @@ class Settings(BaseSettings):
     @property
     def csv_dir(self) -> Path:
         return self.output_dir / "csv"
+
+    @property
+    def manifest_path(self) -> Path:
+        return self.output_dir / "manifest.json"
 
 
 def get_settings() -> Settings:
