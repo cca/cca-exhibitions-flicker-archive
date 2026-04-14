@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     skip_llm: bool = False
     output_dir: Path = Path("output")
     download_concurrency: int = 3
+    download_rate: float = 2.0  # tokens per second for Flickr CDN
 
     @model_validator(mode="after")
     def _check_llm_api_key(self) -> "Settings":

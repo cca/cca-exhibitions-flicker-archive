@@ -1,12 +1,18 @@
 """Tests for the async image downloader."""
 
+import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import httpx
 import pytest
 
-from cca_archive.downloader import _get_download_url, _get_extension, download_photos
+from cca_archive.downloader import (
+    TokenBucketLimiter,
+    _get_download_url,
+    _get_extension,
+    download_photos,
+)
 from cca_archive.models import PhotoRecord
 
 
@@ -75,6 +81,10 @@ class TestGetExtension:
 
 # ---------------------------------------------------------------------------
 # download_photos (async)
+#
+# Integration tests patch TokenBucketLimiter.acquire as a no-op so the
+# while-True pacing loop doesn't spin forever against mocked asyncio.sleep.
+# TokenBucketLimiter itself is exercised in TestTokenBucketLimiter below.
 # ---------------------------------------------------------------------------
 
 
@@ -96,7 +106,10 @@ async def test_download_writes_file_and_sets_local_filename(tmp_path: Path):
     photo = _make_photo("42", "https://example.com/42.png")
     fake_resp = _fake_response(b"PNG image data")
 
-    with patch("cca_archive.downloader.httpx.AsyncClient") as MockClient:
+    with (
+        patch("cca_archive.downloader.httpx.AsyncClient") as MockClient,
+        patch.object(TokenBucketLimiter, "acquire", new_callable=AsyncMock),
+    ):
         mock_client = AsyncMock()
         mock_client.get.return_value = fake_resp
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -118,7 +131,10 @@ async def test_skips_already_existing_files(tmp_path: Path):
     existing = tmp_path / "99.jpg"
     existing.write_bytes(b"already here")
 
-    with patch("cca_archive.downloader.httpx.AsyncClient") as MockClient:
+    with (
+        patch("cca_archive.downloader.httpx.AsyncClient") as MockClient,
+        patch.object(TokenBucketLimiter, "acquire", new_callable=AsyncMock),
+    ):
         mock_client = AsyncMock()
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -136,7 +152,11 @@ async def test_skips_already_existing_files(tmp_path: Path):
 async def test_handles_http_error_gracefully(tmp_path: Path):
     photo = _make_photo("77", "https://example.com/77.jpg")
 
-    with patch("cca_archive.downloader.httpx.AsyncClient") as MockClient:
+    with (
+        patch("cca_archive.downloader.httpx.AsyncClient") as MockClient,
+        patch.object(TokenBucketLimiter, "acquire", new_callable=AsyncMock),
+        patch("cca_archive.downloader.asyncio.sleep", new_callable=AsyncMock),
+    ):
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.HTTPStatusError(
             "Server Error",
@@ -155,7 +175,10 @@ async def test_handles_http_error_gracefully(tmp_path: Path):
 
 @pytest.mark.asyncio
 async def test_empty_photo_list(tmp_path: Path):
-    with patch("cca_archive.downloader.httpx.AsyncClient") as MockClient:
+    with (
+        patch("cca_archive.downloader.httpx.AsyncClient") as MockClient,
+        patch.object(TokenBucketLimiter, "acquire", new_callable=AsyncMock),
+    ):
         mock_client = AsyncMock()
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -184,12 +207,17 @@ async def test_retries_on_429_then_succeeds(tmp_path: Path):
     resp_429 = _fake_429_response()
     resp_200 = _fake_response(b"image data")
 
+    signal_calls: list[float] = []
+
+    def capture_signal_429(self_limiter: TokenBucketLimiter, delay: float) -> None:
+        signal_calls.append(delay)
+
     with (
         patch("cca_archive.downloader.httpx.AsyncClient") as MockClient,
-        patch("cca_archive.downloader.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        patch.object(TokenBucketLimiter, "acquire", new_callable=AsyncMock),
+        patch.object(TokenBucketLimiter, "signal_429", capture_signal_429),
     ):
         mock_client = AsyncMock()
-        # First call raises 429, second call succeeds
         mock_client.get.side_effect = [
             httpx.HTTPStatusError(
                 "Too Many Requests",
@@ -205,9 +233,8 @@ async def test_retries_on_429_then_succeeds(tmp_path: Path):
 
     assert result[0].local_filename == "10.jpg"
     assert (tmp_path / "10.jpg").read_bytes() == b"image data"
-    # asyncio.sleep should have been called for the 429 backoff (4s on attempt 0)
-    sleep_calls = [c for c in mock_sleep.call_args_list if c != call(0)]
-    assert any(args[0] >= 4 for args, _ in [c for c in sleep_calls if c[0]])
+    # signal_429 should have been called with the _BASE_429_DELAY (30s)
+    assert signal_calls and signal_calls[0] >= 4
 
 
 @pytest.mark.asyncio
@@ -224,7 +251,7 @@ async def test_429_exhausts_retries(tmp_path: Path):
 
     with (
         patch("cca_archive.downloader.httpx.AsyncClient") as MockClient,
-        patch("cca_archive.downloader.asyncio.sleep", new_callable=AsyncMock),
+        patch.object(TokenBucketLimiter, "acquire", new_callable=AsyncMock),
     ):
         mock_client = AsyncMock()
         mock_client.get.side_effect = _raise_429
@@ -235,5 +262,64 @@ async def test_429_exhausts_retries(tmp_path: Path):
 
     assert result[0].local_filename is None
     assert not (tmp_path / "11.jpg").exists()
-    # Should have attempted 5 times (1 initial + 4 retries)
-    assert mock_client.get.call_count == 5
+    # Should have attempted 12 times (_MAX_ATTEMPTS)
+    assert mock_client.get.call_count == 12
+
+
+# ---------------------------------------------------------------------------
+# TokenBucketLimiter unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestTokenBucketLimiter:
+    @pytest.mark.asyncio
+    async def test_signal_429_blocks_acquire(self):
+        """signal_429 sets a pause; subsequent acquire() sleeps until it elapses."""
+        limiter = TokenBucketLimiter(rate=100.0, burst=10)
+        sleep_calls: list[float] = []
+        call_count = 0
+
+        async def fake_sleep_once(seconds: float) -> None:
+            nonlocal call_count
+            call_count += 1
+            sleep_calls.append(seconds)
+            # Clear the pause after the first sleep so acquire() can proceed
+            limiter._pause_until = 0.0
+
+        loop = asyncio.get_running_loop()
+        limiter._pause_until = loop.time() + 10.0
+
+        with patch("cca_archive.downloader.asyncio.sleep", side_effect=fake_sleep_once):
+            await limiter.acquire()
+
+        assert call_count >= 1
+        assert sleep_calls[0] > 0  # slept for the pause duration
+
+    @pytest.mark.asyncio
+    async def test_signal_429_never_shrinks_pause(self):
+        """Calling signal_429 with a shorter delay should not reduce an existing pause."""
+        limiter = TokenBucketLimiter(rate=100.0, burst=10)
+        loop = asyncio.get_running_loop()
+        long_pause = loop.time() + 60.0
+        limiter._pause_until = long_pause
+
+        # Signal a shorter delay — should not reduce the existing pause
+        limiter.signal_429(5.0)
+        assert limiter._pause_until >= long_pause
+
+    @pytest.mark.asyncio
+    async def test_tokens_consumed_per_request(self):
+        """Burst tokens are consumed without sleeping when rate is high."""
+        limiter = TokenBucketLimiter(rate=100.0, burst=5)
+        sleep_called = False
+
+        async def no_sleep(seconds: float) -> None:
+            nonlocal sleep_called
+            sleep_called = True
+
+        with patch("cca_archive.downloader.asyncio.sleep", side_effect=no_sleep):
+            for _ in range(5):
+                await limiter.acquire()
+
+        assert not sleep_called
+        assert limiter._tokens < 1.0
