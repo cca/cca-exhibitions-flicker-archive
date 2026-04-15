@@ -1,0 +1,42 @@
+services:
+  iiif:
+    image: uclalibrary/cantaloupe:5.0.7-0
+    ports:
+      - "8182:8182"
+    volumes:
+      - ./output/tiffs:/images:ro
+    environment:
+      CANTALOUPE_SOURCE_STATIC: FilesystemSource
+      CANTALOUPE_FILESYSTEMSOURCE_BASICLOOKUPSTRATEGY_PATH_PREFIX: /images/
+      CANTALOUPE_CACHE_SERVER_RESOLVE_FIRST: "true"
+      CANTALOUPE_PROCESSOR_SELECTION_STRATEGY: AutomaticSelectionStrategy
+      CANTALOUPE_CACHE_SERVER_DERIVATIVE_ENABLED: "true"
+      CANTALOUPE_CACHE_SERVER_DERIVATIVE: FilesystemCache
+      CANTALOUPE_FILESYSTEMCACHE_PATHNAME: /var/cache/cantaloupe
+      CANTALOUPE_CACHE_SERVER_TTL_SECONDS: "0"
+      CANTALOUPE_ENDPOINT_ADMIN_ENABLED: "true"
+      CANTALOUPE_ENDPOINT_ADMIN_SECRET: admin
+
+  pipeline:
+    build:
+      context: .
+      target: pipeline
+    env_file: .env
+    volumes:
+      - ./output:/app/output
+    command: uv run cca-archive --all --skip-existing
+
+  frontend:
+    build:
+      context: .
+      target: frontend-build
+    volumes:
+      - ./output/csv:/app/output/csv:ro
+      - ./frontend/src:/app/frontend/src
+    environment:
+      PUBLIC_IIIF_BASE_URL: http://localhost:8182/iiif/3
+    ports:
+      - "4321:4321"
+    command: npm run dev -- --host
+    depends_on:
+      - iiif

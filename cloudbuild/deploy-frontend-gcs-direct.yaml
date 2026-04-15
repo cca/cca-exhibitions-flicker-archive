@@ -1,0 +1,46 @@
+substitutions:
+  _ARTIFACT_REGISTRY: ccaweb
+  _REGION: us-west1
+  _SERVICE_NAME: cca-exhibitions-archive-frontend
+  _SERVICE_ACCOUNT: ccaedu-sa
+  _IMAGE_NAME: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REGISTRY}/${_SERVICE_NAME}
+  _PUBLIC_GCS_BASE_URL: ""           # set in trigger config
+  _PUBLIC_GCS_IMAGE_BASE_URL: ""     # public GCS base for web images — set in trigger config
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - --target=serve
+      - --build-arg=PUBLIC_GCS_BASE_URL=${_PUBLIC_GCS_BASE_URL}
+      - --build-arg=PUBLIC_GCS_IMAGE_BASE_URL=${_PUBLIC_GCS_IMAGE_BASE_URL}
+      - -t=${_IMAGE_NAME}:${COMMIT_SHA}
+      - -t=${_IMAGE_NAME}:latest
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: push
+    args: [push, --all-tags, "${_IMAGE_NAME}"]
+    waitFor: [build]
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image=${_IMAGE_NAME}:${COMMIT_SHA}
+      - --region=${_REGION}
+      - --platform=managed
+      - --port=8080
+      - --allow-unauthenticated
+      - --service-account=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com
+    waitFor: [push]
+
+images: [${_IMAGE_NAME}:${COMMIT_SHA}, ${_IMAGE_NAME}:latest]
+options:
+  logging: GCS_ONLY
+  dynamic_substitutions: true
+timeout: 600s

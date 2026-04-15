@@ -1,0 +1,17 @@
+# Local image symlink — broken in container; Cantaloupe reads from mounted volume or GCS
+frontend/public/images
+
+# Pipeline output — large, not needed in build context
+output/
+
+# Secrets
+.env
+
+# Dev artifacts
+.venv/
+**/__pycache__/
+*.pyc
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.git/

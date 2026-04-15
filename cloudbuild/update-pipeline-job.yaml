@@ -1,0 +1,41 @@
+substitutions:
+  _ARTIFACT_REGISTRY: ccaweb
+  _REGION: us-west1
+  _SERVICE_ACCOUNT: ccaedu-sa
+  _JOB_NAME: cca-exhibitions-archive-pipeline
+  _IMAGE_NAME: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REGISTRY}/${_JOB_NAME}
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-pipeline
+    args: [build, --target=pipeline, -t=${_IMAGE_NAME}:${COMMIT_SHA}, -t=${_IMAGE_NAME}:latest, .]
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-pipeline
+    args: [push, --all-tags, "${_IMAGE_NAME}"]
+    waitFor: [build-pipeline]
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-job
+    entrypoint: gcloud
+    args:
+      - run
+      - jobs
+      - deploy
+      - ${_JOB_NAME}
+      - --image=${_IMAGE_NAME}:${COMMIT_SHA}
+      - --region=${_REGION}
+      - --service-account=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com
+      - --set-secrets=/app/.env=cca-exhibitions-archive-settings:latest
+      - --args=--all,--skip-existing,--upload-gcs
+      - --max-retries=1
+      - --task-timeout=10800
+      - --cpu=2
+      - --memory=2Gi
+    waitFor: [push-pipeline]
+
+images: [${_IMAGE_NAME}:${COMMIT_SHA}, ${_IMAGE_NAME}:latest]
+options:
+  logging: GCS_ONLY
+  dynamic_substitutions: true
+timeout: 900s

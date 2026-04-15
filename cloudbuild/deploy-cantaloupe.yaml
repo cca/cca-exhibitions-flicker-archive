@@ -1,0 +1,34 @@
+substitutions:
+  _ARTIFACT_REGISTRY: ccaweb
+  _REGION: us-west1
+  _SERVICE_NAME: cca-exhibitions-archive-iiif
+  _SERVICE_ACCOUNT: ccaedu-sa
+  _GCS_BUCKET: ""   # set in trigger config
+
+steps:
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-cantaloupe
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image=uclalibrary/cantaloupe:5.0.7-0
+      - --region=${_REGION}
+      - --platform=managed
+      - --port=8182
+      - --allow-unauthenticated
+      - --service-account=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com
+      - --set-env-vars=CANTALOUPE_SOURCE_STATIC=HttpSource
+      - --set-env-vars=CANTALOUPE_HTTPSOURCE_BASICLOOKUPSTRATEGY_URL_PREFIX=https://storage.googleapis.com/${_GCS_BUCKET}/tiffs/
+      - --set-env-vars=CANTALOUPE_CACHE_SERVER_RESOLVE_FIRST=true
+      - --set-env-vars=CANTALOUPE_PROCESSOR_SELECTION_STRATEGY=AutomaticSelectionStrategy
+      - --cpu=1
+      - --memory=1Gi
+      - --min-instances=0
+      - --max-instances=4
+
+options:
+  logging: GCS_ONLY
+  dynamic_substitutions: true
+timeout: 300s

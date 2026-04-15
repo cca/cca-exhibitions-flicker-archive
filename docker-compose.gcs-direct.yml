@@ -1,0 +1,19 @@
+services:
+  pipeline:
+    build:
+      context: .
+      target: pipeline
+    volumes:
+      - ./output:/app/output
+    env_file: .env
+    command: uv run cca-archive --all --skip-existing
+
+  frontend:
+    build:
+      context: .
+      target: serve
+      args:
+        PUBLIC_GCS_BASE_URL: ${PUBLIC_GCS_BASE_URL}
+        PUBLIC_GCS_IMAGE_BASE_URL: ${PUBLIC_GCS_IMAGE_BASE_URL}
+    ports:
+      - "8080:8080"
