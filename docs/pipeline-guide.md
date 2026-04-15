@@ -19,6 +19,12 @@ LLM extraction        ← pydantic-ai agent parses freeform descriptions
 Downloader            Manifest (stage status written after each stage)
     │
     ▼
+Image optimizer       ← resizes to web-ready full + thumbnail JPEGs (pyvips)
+    │
+    ▼
+TIFF converter        ← pyramidal tiled TIFFs for IIIF serving (pyvips)
+    │
+    ▼
 CSV export
     │
     ▼
@@ -44,11 +50,13 @@ uv run cca-archive sync [--ia] [--gcs]
 | `--all` | Process all albums for the configured Flickr user |
 | `--skip-download` | Skip image downloads; fetch metadata and export CSV only |
 | `--skip-llm` | Skip LLM extraction; use raw Flickr data only |
+| `--skip-optimize` | Skip web image optimization (full + thumbnail JPEG generation) |
+| `--skip-tiff-convert` | Skip pyramidal TIFF conversion |
 | `--skip-existing` | Skip albums recorded as complete in the manifest (`csv_export.status == "success"`), falling back to CSV file existence for pre-manifest albums. Mutually exclusive with `--retry-llm-failures`. |
 | `--retry-llm-failures` | Re-run LLM extraction and CSV export for albums where `llm_extraction.status == "failed"` in the manifest. Downloads are skipped implicitly. Mutually exclusive with `--skip-existing`. |
 | `--limit N` | Stop after processing N albums (applied after `--skip-existing`) |
 | `--upload-ia` | Upload images to Internet Archive after each album |
-| `--upload-gcs` | Upload images and CSV to Google Cloud Storage after each album |
+| `--upload-gcs` | Upload web images and CSV to Google Cloud Storage after each album |
 
 Album IDs can be extracted from any of these URL shapes:
 - `https://www.flickr.com/photos/ccaexhibitions/albums/72177720332161605`
@@ -66,6 +74,17 @@ uv run cca-archive sync --gcs    # Google Cloud Storage only
 ```
 
 It scans `output/images/` for album directories and uploads each one.
+
+### `convert-tiffs` subcommand
+
+Standalone command to convert all downloaded JPEGs to pyramidal TIFFs without running the rest of the pipeline.
+
+```bash
+uv run cca-archive convert-tiffs
+uv run cca-archive convert-tiffs --concurrency 8
+```
+
+Reads from `output/images/` and writes to `output/tiffs/`. Skips files that already have a corresponding TIFF.
 
 ### `backfill-manifest` subcommand
 
@@ -120,7 +139,8 @@ LLM_MODEL=openai:gpt-4o
 | Variable | Default | Description |
 |---|---|---|
 | `OUTPUT_DIR` | `output` | Root directory for all output |
-| `DOWNLOAD_CONCURRENCY` | `3` | Simultaneous image downloads |
+| `DOWNLOAD_CONCURRENCY` | `3` | Simultaneous image downloads / optimizations / TIFF conversions |
+| `SKIP_OPTIMIZE` | `false` | Disable image optimization globally |
 
 ### Internet Archive
 
@@ -136,6 +156,7 @@ LLM_MODEL=openai:gpt-4o
 |---|---|---|
 | `GCS_BUCKET` | — | GCS bucket name |
 | `GCS_CREDENTIALS_FILE` | — | Path to service account JSON. Omit to use Application Default Credentials (ADC). |
+| `GCS_PUBLIC_BASE` | — | Public base URL for the bucket (e.g. `https://storage.googleapis.com/my-bucket`). Used to construct public image URLs in the manifest. |
 
 ---
 
@@ -147,6 +168,8 @@ A single `Settings` class (pydantic-settings) that loads all config from `.env`.
 
 Computed properties:
 - `settings.images_dir` → `output_dir / "images"`
+- `settings.web_dir` → `output_dir / "web"` (optimized JPEGs)
+- `settings.tiffs_dir` → `output_dir / "tiffs"` (pyramidal TIFFs)
 - `settings.csv_dir` → `output_dir / "csv"`
 - `settings.manifest_path` → `output_dir / "manifest.json"`
 
@@ -170,10 +193,14 @@ Tracks per-stage status for every album processed. Written to `output/manifest.j
 | Stage | Valid statuses |
 |---|---|
 | `llm_extraction` | `success`, `failed`, `skipped` (no description or `--skip-llm`) |
-| `image_download` | `success`, `failed`, `skipped` (`--skip-download`) |
+| `image_download` | `success`, `partial` (some photos failed), `skipped` (`--skip-download`) |
+| `image_optimization` | `success`, `partial`, `failed`, `skipped` (`--skip-optimize` or `--skip-download`) |
+| `tiff_conversion` | `success`, `failed`, `skipped` (`--skip-tiff-convert` or `--skip-download`) |
 | `csv_export` | `success`, `failed` |
 | `ia_upload` | `not_attempted`, `success`, `failed` |
 | `gcs_upload` | `not_attempted`, `success`, `failed` |
+
+Albums with `image_download.status == "partial"` are not considered complete by `--skip-existing` and will be retried on the next run.
 
 `pipeline.py` calls `update_stage` + `save_manifest` after each stage so the manifest reflects partial progress even if the pipeline is interrupted mid-album.
 
@@ -317,6 +344,51 @@ This shared-backoff approach avoids the thundering herd problem where 3 concurre
 
 ---
 
+### `image_optimizer.py` — Web image optimization
+
+Resizes downloaded JPEGs into two derivative formats for web serving:
+
+| Derivative | Max dimension | Quality | Max file size |
+|---|---|---|---|
+| Full (`{photo_id}.jpg`) | 2560px on longest side | Q=85 (Q=75 fallback if >1MB) | 1MB |
+| Thumbnail (`{photo_id}_thumb.jpg`) | 400px on longest side | Q=85 | — |
+
+Uses [pyvips](https://libvips.github.io/pyvips/) for fast, memory-efficient resizing. Runs async using `asyncio.Semaphore` with `DOWNLOAD_CONCURRENCY` workers. Skips photos where both derivatives already exist.
+
+Output goes to `output/web/{slug}/`.
+
+**Key functions:**
+
+| Function | Description |
+|---|---|
+| `optimize_album_images(slug, images_dir, web_dir, concurrency)` | Optimize all photos in one album |
+| `optimize_all_images(images_dir, web_dir, concurrency)` | Optimize all albums (standalone use) |
+
+Returns `(optimized_count, skipped_count, failed_photo_ids)`.
+
+---
+
+### `tiff_converter.py` — Pyramidal TIFF conversion
+
+Converts downloaded JPEGs to pyramidal tiled TIFFs suitable for IIIF serving via Cantaloupe or Internet Archive:
+
+- Tile size: 256×256px
+- Compression: JPEG (Q=85)
+- Pyramid levels: auto-generated by pyvips
+
+Uses pyvips with sequential access (streaming, low memory). Runs async with semaphore concurrency. Skips photos where a TIFF already exists.
+
+Output goes to `output/tiffs/{slug}/`.
+
+**Key functions:**
+
+| Function | Description |
+|---|---|
+| `convert_album_tiffs(slug, images_dir, tiffs_dir, concurrency)` | Convert all photos in one album |
+| `convert_all_tiffs(images_dir, tiffs_dir, concurrency)` | Convert all albums (used by `convert-tiffs` subcommand) |
+
+---
+
 ### `csv_export.py` — CSV export
 
 **Format**
@@ -327,7 +399,7 @@ One row per photo. Album-level and exhibition-level fields are repeated on every
 
 | Group | Columns |
 |---|---|
-| Album | `album_id`, `album_title`, `album_url`, `album_photo_count`, `album_date_created`, `ia_identifier` |
+| Album | `album_id`, `album_title`, `album_url`, `album_photo_count`, `album_date_created`, `slug`, `ia_identifier` |
 | Exhibition (LLM) | `exhibition_title`, `artists`, `curator`, `venue`, `address`, `photographer`, `opening_date`, `closing_date`, `reception_date`, `medium`, `description_summary`, `raw_description` |
 | Photo | `photo_id`, `photo_title`, `photo_description`, `photo_tags`, `date_taken`, `date_uploaded`, `photo_views`, `license`, `original_url`, `local_filename` |
 
@@ -413,19 +485,26 @@ Only recognized image formats are uploaded: `.jpg`, `.jpeg`, `.png`, `.gif`, `.t
 
 ```
 output/
-├── images/
+├── images/                          # raw downloads (original resolution)
 │   ├── afterlight/
 │   │   ├── 54321234.jpg
 │   │   └── ...
 │   └── josh-sioux-reyes/
 │       └── ...
+├── web/                             # optimized web JPEGs
+│   └── afterlight/
+│       ├── 54321234.jpg             # full size (≤2560px, ≤1MB)
+│       └── 54321234_thumb.jpg       # thumbnail (≤400px)
+├── tiffs/                           # pyramidal TIFFs for IIIF
+│   └── afterlight/
+│       └── 54321234.tif
 ├── csv/
 │   ├── afterlight.csv
 │   └── josh-sioux-reyes.csv
 └── manifest.json
 ```
 
-Image filenames are the Flickr photo ID with the original extension (e.g., `54321234.jpg`). Album directory names and CSV filenames use the same slug so they always correspond.
+Image filenames use the Flickr photo ID. Album directory names and CSV filenames use the same slug so they always correspond.
 
 ---
 

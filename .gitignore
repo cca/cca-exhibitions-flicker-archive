@@ -29,3 +29,4 @@ frontend/.vscode/
 
 # OS
 .DS_Store
+frontend/public/images
