@@ -15,10 +15,12 @@ from .config import Settings, get_settings
 from .csv_export import export_album_csv
 from .downloader import download_photos
 from .flickr_client import FlickrClient, extract_photographer_from_photos, parse_album_url
-from .gcs_uploader import upload_album_images_to_gcs, upload_csv_to_gcs
+from .gcs_uploader import upload_album_tiffs_to_gcs, upload_album_web_images_to_gcs, upload_csv_to_gcs, update_gcs_manifest
 from .ia_uploader import upload_album_to_ia
+from .image_optimizer import optimize_album_images, optimize_all_images
 from .llm import extract_exhibition_metadata
 from .manifest import get_failed_llm_slugs, load_manifest, save_manifest, update_stage
+from .tiff_converter import convert_album_tiffs, convert_all_tiffs
 from .models import AlbumRecord
 
 console = Console()
@@ -35,12 +37,17 @@ def _album_title(a: dict) -> str:
 def _is_complete(album: dict, manifest: dict, existing_csvs: set[str]) -> bool:
     """Return True if the album has been fully processed.
 
-    Uses manifest csv_export status when available; falls back to CSV existence
-    for albums that predate the manifest (backward compat).
+    Uses manifest stages when available; falls back to CSV existence for albums
+    that predate the manifest (backward compat). Albums with partial image
+    downloads are not considered complete so they will be retried.
     """
     slug = slugify(_album_title(album))
     if slug in manifest:
-        return manifest[slug].get("stages", {}).get("csv_export", {}).get("status") == "success"
+        stages = manifest[slug].get("stages", {})
+        csv_ok = stages.get("csv_export", {}).get("status") == "success"
+        dl_status = stages.get("image_download", {}).get("status", "success")
+        dl_ok = dl_status in ("success", "skipped")
+        return csv_ok and dl_ok
     return slug in existing_csvs
 
 
@@ -49,6 +56,8 @@ async def process_album(
     client: FlickrClient,
     skip_download: bool = False,
     skip_llm: bool = False,
+    skip_tiff_convert: bool = False,
+    skip_optimize: bool = False,
     upload_ia: bool = False,
     upload_gcs: bool = False,
 ) -> int:
@@ -97,6 +106,7 @@ async def process_album(
             console.print(f"  Photographer (from photos): [green]{photographer}[/green]")
 
     # Download images
+    failed_photo_ids: list[str] = []
     if skip_download:
         dl_status = "skipped"
     elif not album.photos:
@@ -109,11 +119,63 @@ async def process_album(
             concurrency=settings.download_concurrency,
             rate=settings.download_rate,
         )
-        dl_status = "success"
+        failed_photo_ids = [p.photo_id for p in album.photos if not p.local_filename]
+        dl_status = "partial" if failed_photo_ids else "success"
+        if failed_photo_ids:
+            console.print(
+                f"  [yellow]Warning: {len(failed_photo_ids)} photo(s) failed to download "
+                f"and will be retried on next run[/yellow]"
+            )
     downloaded = sum(1 for p in album.photos if p.local_filename)
     total = len(album.photos)
     update_stage(manifest, slug, album_id, album.title, "image_download", dl_status,
-                 downloaded=downloaded, total=total)
+                 downloaded=downloaded, total=total,
+                 failed_photo_ids=failed_photo_ids or None)
+    save_manifest(manifest, settings)
+
+    # Optimize images for web serving (full + thumbnail JPEGs)
+    optimize_status = "skipped"
+    optimize_error = None
+    opt_failed_ids: list[str] = []
+    if not skip_optimize and not skip_download:
+        try:
+            opt_count, skipped_opt, opt_failed_ids = await optimize_album_images(
+                slug, settings.images_dir, settings.web_dir,
+                concurrency=settings.download_concurrency,
+            )
+            if opt_failed_ids:
+                if opt_count + skipped_opt > 0:
+                    optimize_status = "partial"
+                else:
+                    optimize_status = "failed"
+                console.print(f"  [yellow]Warning: {len(opt_failed_ids)} image(s) failed optimization: {', '.join(opt_failed_ids)}[/yellow]")
+            else:
+                optimize_status = "success"
+            console.print(f"  [bold green]Image optimization:[/bold green] {opt_count} optimized, {skipped_opt} already existed")
+        except Exception as e:
+            optimize_status = "failed"
+            optimize_error = str(e)
+            console.print(f"  [red]Image optimization failed: {e}[/red]")
+    update_stage(manifest, slug, album_id, album.title, "image_optimization", optimize_status,
+                 error=optimize_error, failed_photo_ids=opt_failed_ids or None)
+    save_manifest(manifest, settings)
+
+    # Convert images to pyramidal TIFFs (for IIIF/IA serving path)
+    tiff_status = "skipped"
+    tiff_error = None
+    if not skip_tiff_convert and not skip_download:
+        try:
+            converted, skipped_tiffs = await convert_album_tiffs(
+                slug, settings.images_dir, settings.tiffs_dir,
+                concurrency=settings.download_concurrency,
+            )
+            tiff_status = "success"
+            console.print(f"  [bold green]TIFF conversion:[/bold green] {converted} converted, {skipped_tiffs} already existed")
+        except Exception as e:
+            tiff_status = "failed"
+            tiff_error = str(e)
+            console.print(f"  [red]TIFF conversion failed: {e}[/red]")
+    update_stage(manifest, slug, album_id, album.title, "tiff_conversion", tiff_status, error=tiff_error)
     save_manifest(manifest, settings)
 
     # Upload to Internet Archive
@@ -151,8 +213,9 @@ async def process_album(
     gcs_error = None
     if upload_gcs:
         try:
-            await upload_album_images_to_gcs(album, settings.images_dir, settings)
+            await upload_album_web_images_to_gcs(album, settings.web_dir, settings)
             await upload_csv_to_gcs(csv_path, settings)
+            await update_gcs_manifest(settings, slug)
             gcs_status = "success"
         except Exception as e:
             gcs_status = "failed"
@@ -168,6 +231,8 @@ async def process_all_albums(
     client: FlickrClient,
     skip_download: bool = False,
     skip_llm: bool = False,
+    skip_tiff_convert: bool = False,
+    skip_optimize: bool = False,
     skip_existing: bool = False,
     limit: int | None = None,
     upload_ia: bool = False,
@@ -224,7 +289,8 @@ async def process_all_albums(
         album_id = str(a["id"])
         try:
             photo_count = await process_album(
-                album_id, client, skip_download, skip_llm, upload_ia, upload_gcs
+                album_id, client, skip_download, skip_llm, skip_tiff_convert,
+                skip_optimize=skip_optimize, upload_ia=upload_ia, upload_gcs=upload_gcs,
             )
             total_albums_processed += 1
             total_photos += photo_count
@@ -360,8 +426,9 @@ async def sync_command(upload_ia: bool, upload_gcs: bool, settings) -> None:
 
         if upload_gcs:
             try:
-                await upload_album_images_to_gcs(album, images_dir, settings)
+                await upload_album_tiffs_to_gcs(album, settings.tiffs_dir, settings)
                 await upload_csv_to_gcs(csv_path, settings)
+                await update_gcs_manifest(settings, slug)
             except Exception as e:
                 console.print(f"  [red]GCS upload failed for {slug}: {e}[/red]")
 
@@ -391,6 +458,28 @@ def _run_sync_command(argv: list[str]) -> None:
     asyncio.run(sync_command(upload_ia, upload_gcs, settings))
 
 
+def _run_convert_tiffs_command(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        prog="cca-archive convert-tiffs",
+        description="Convert downloaded JPEGs to pyramidal tiled TIFFs for IIIF serving",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=4,
+        help="Number of parallel conversions (default: 4)",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        settings = get_settings()
+    except ValidationError as e:
+        console.print(f"[red]Settings error:[/red] {e}")
+        sys.exit(1)
+
+    asyncio.run(convert_all_tiffs(settings.images_dir, settings.tiffs_dir, args.concurrency))
+
+
 def _run_backfill_manifest_command(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(
         prog="cca-archive backfill-manifest",
@@ -411,6 +500,9 @@ def main() -> None:
     # Fast-path: dispatch subcommands before full parser runs
     if len(sys.argv) > 1 and sys.argv[1] == "sync":
         _run_sync_command(sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "convert-tiffs":
+        _run_convert_tiffs_command(sys.argv[2:])
         return
     if len(sys.argv) > 1 and sys.argv[1] == "backfill-manifest":
         _run_backfill_manifest_command(sys.argv[2:])
@@ -456,6 +548,16 @@ def main() -> None:
         action="store_true",
         help="Upload images and CSV to Google Cloud Storage after download",
     )
+    parser.add_argument(
+        "--skip-tiff-convert",
+        action="store_true",
+        help="Skip TIFF conversion (conversion runs automatically by default)",
+    )
+    parser.add_argument(
+        "--skip-optimize",
+        action="store_true",
+        help="Skip image optimization (full + thumbnail JPEG generation)",
+    )
 
     skip_group = parser.add_mutually_exclusive_group()
     skip_group.add_argument(
@@ -482,6 +584,8 @@ def main() -> None:
             client,
             skip_download=args.skip_download,
             skip_llm=args.skip_llm,
+            skip_tiff_convert=args.skip_tiff_convert,
+            skip_optimize=args.skip_optimize,
             skip_existing=args.skip_existing,
             limit=args.limit,
             upload_ia=args.upload_ia,
@@ -492,6 +596,8 @@ def main() -> None:
         album_id = parse_album_url(args.album_url)
         asyncio.run(process_album(
             album_id, client, args.skip_download, args.skip_llm,
+            skip_tiff_convert=args.skip_tiff_convert,
+            skip_optimize=args.skip_optimize,
             upload_ia=args.upload_ia,
             upload_gcs=args.upload_gcs,
         ))

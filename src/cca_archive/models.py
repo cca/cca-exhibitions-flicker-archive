@@ -50,5 +50,6 @@ class AlbumRecord(BaseModel):
     photo_count: int = 0
     date_created: Optional[datetime] = None
     date_updated: Optional[datetime] = None
+    ia_identifier: Optional[str] = None
     exhibition: Optional[ExhibitionMetadata] = None
     photos: list[PhotoRecord] = []

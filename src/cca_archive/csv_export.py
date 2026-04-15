@@ -34,6 +34,7 @@ CSV_COLUMNS = [
     "license",
     "original_url",
     "local_filename",
+    "ia_identifier",
 ]
 
 
@@ -81,6 +82,7 @@ def export_album_csv(album: AlbumRecord, dest_dir: Path) -> Path:
                 "license": photo.license or "",
                 "original_url": photo.original_url or photo.large_url or photo.medium_url or "",
                 "local_filename": photo.local_filename or "",
+                "ia_identifier": album.ia_identifier or "",
             }
             writer.writerow(row)
 
