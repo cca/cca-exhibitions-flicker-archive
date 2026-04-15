@@ -5,8 +5,8 @@ import EntryPoints from "../components/EntryPoints.astro";
 import RecentStrip from "../components/RecentStrip.astro";
 import { getAllAlbums, getRecentAlbums } from "../lib/data";
 
-const allAlbums = getAllAlbums();
-const recentAlbums = getRecentAlbums(8);
+const allAlbums = await getAllAlbums();
+const recentAlbums = await getRecentAlbums(8);
 ---
 
 <Base title="Home">

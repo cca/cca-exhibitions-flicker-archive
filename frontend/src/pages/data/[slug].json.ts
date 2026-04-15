@@ -1,15 +1,16 @@
 import type { APIRoute, GetStaticPaths } from "astro";
 import { getAllAlbums } from "../../lib/data";
 
-export const getStaticPaths: GetStaticPaths = () => {
-  const albums = getAllAlbums();
+export const getStaticPaths: GetStaticPaths = async () => {
+  const albums = await getAllAlbums();
   return albums.map((album) => ({
     params: { slug: album.slug },
   }));
 };
 
-export const GET: APIRoute = ({ params }) => {
-  const album = getAllAlbums().find((a) => a.slug === params.slug);
+export const GET: APIRoute = async ({ params }) => {
+  const albums = await getAllAlbums();
+  const album = albums.find((a) => a.slug === params.slug);
 
   if (!album) {
     return new Response(JSON.stringify({ error: "Album not found" }), {

@@ -2,14 +2,14 @@
 import Immersive from "../layouts/Immersive.astro";
 import { getAllAlbums, getRandomAlbum } from "../lib/data";
 
-const albums = getAllAlbums();
+const albums = await getAllAlbums();
 const albumIndex = albums.map((a) => ({
   slug: a.slug,
   exhibition_title: a.exhibition_title,
   venue: a.venue,
 }));
 
-const initial = getRandomAlbum();
+const initial = await getRandomAlbum();
 const initialData = initial
   ? {
       slug: initial.slug,

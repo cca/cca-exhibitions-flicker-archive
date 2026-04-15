@@ -4,7 +4,7 @@ import TimelineNav from "../components/TimelineNav.astro";
 import TimelineYear from "../components/TimelineYear.astro";
 import { getAlbumsByYear } from "../lib/data";
 
-const albumsByYear = getAlbumsByYear();
+const albumsByYear = await getAlbumsByYear();
 const yearEntries = [...albumsByYear.entries()];
 const years = yearEntries.map(([year]) => year);
 ---

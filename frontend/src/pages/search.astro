@@ -3,7 +3,7 @@ import Base from "../layouts/Base.astro";
 import FilterBar from "../components/FilterBar.astro";
 import { getAllAlbums } from "../lib/data";
 
-const albums = getAllAlbums();
+const albums = await getAllAlbums();
 ---
 
 <Base title="Search">

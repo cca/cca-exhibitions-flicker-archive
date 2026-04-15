@@ -5,14 +5,14 @@ import PhotoGrid from "../../components/PhotoGrid.astro";
 import { getAllAlbums, getAlbumBySlug } from "../../lib/data";
 import type { Album, Photo } from "../../lib/data";
 
-export function getStaticPaths() {
-  return getAllAlbums().map((album) => ({
+export async function getStaticPaths() {
+  return (await getAllAlbums()).map((album) => ({
     params: { slug: album.slug },
   }));
 }
 
 const { slug } = Astro.params;
-const album = getAlbumBySlug(slug!)!;
+const album = (await getAlbumBySlug(slug!))!;
 
 function formatDate(iso: string): string {
   if (!iso) return "";

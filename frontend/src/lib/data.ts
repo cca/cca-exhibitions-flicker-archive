@@ -2,6 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import Papa from "papaparse";
 
+const IIIF_BASE = import.meta.env.PUBLIC_IIIF_BASE_URL || "";
+const GCS_BASE = import.meta.env.PUBLIC_GCS_BASE_URL || "";
+const GCS_IMAGE_BASE = import.meta.env.PUBLIC_GCS_IMAGE_BASE_URL || "";
+const LOCAL_IMAGE_BASE = import.meta.env.PUBLIC_LOCAL_IMAGE_BASE || "";
+
 export interface Photo {
   photo_id: string;
   photo_title: string;
@@ -13,8 +18,9 @@ export interface Photo {
   license: string;
   original_url: string;
   local_filename: string;
-  image_src: string; // resolved: local path or Flickr URL
-  thumbnail_src: string; // WebP thumbnail for grid views
+  ia_identifier: string;
+  image_src: string; // resolved: IIIF URL, local path, or Flickr URL
+  thumbnail_src: string; // IIIF thumbnail for grid views
 }
 
 export interface Album {
@@ -24,6 +30,7 @@ export interface Album {
   album_photo_count: number;
   album_date_created: string;
   slug: string;
+  ia_identifier: string;
   exhibition_title: string;
   artists: string[];
   curator: string;
@@ -57,62 +64,95 @@ function splitSemicolon(value: string): string[] {
     .filter(Boolean);
 }
 
-function resolveImageSrc(slug: string, localFilename: string, originalUrl: string, photoId?: string): string {
-  const id = localFilename ? path.parse(localFilename).name : photoId;
-
-  // Prefer the processed 1600px WebP
-  if (id) {
-    const fullPath = path.join(IMAGES_DIR, slug, "full", `${id}.webp`);
-    if (fs.existsSync(fullPath)) {
-      return `/images/${slug}/full/${id}.webp`;
-    }
+/**
+ * Build a IIIF Image API URL for a given photo.
+ * IA uses $ separator (URL-encoded as %24), Cantaloupe uses / (%2F).
+ */
+function iiifUrl(identifier: string, photoId: string, width: number): string {
+  if (IIIF_BASE.includes("archive.org")) {
+    const filename = `${photoId}.jpg`;
+    return `${IIIF_BASE}/${identifier}%24${filename}/full/${width},/0/default.jpg`;
   }
+  // Cantaloupe: use pyramidal TIFFs for efficient resizing
+  const filename = `${photoId}.tif`;
+  return `${IIIF_BASE}/${identifier}%2F${filename}/full/${width},/0/default.jpg`;
+}
 
-  // Fall back to original local file
+function resolveImageSrc(
+  slug: string,
+  localFilename: string,
+  originalUrl: string,
+  photoId: string,
+  iaIdentifier: string,
+): string {
+  // Local optimized / offline build: relative image paths
+  if (LOCAL_IMAGE_BASE) {
+    return `${LOCAL_IMAGE_BASE}/${slug}/${photoId}.jpg`;
+  }
+  // GCS-direct: optimized web JPEG, no IIIF server needed
+  if (GCS_IMAGE_BASE) {
+    return `${GCS_IMAGE_BASE}/web/${slug}/${photoId}.jpg`;
+  }
+  // Internet Archive IIIF — requires ia_identifier
+  if (IIIF_BASE && IIIF_BASE.includes("archive.org") && iaIdentifier) {
+    return iiifUrl(iaIdentifier, photoId, 1600);
+  }
+  // Cantaloupe (local Docker or GCS Cloud Run) — uses slug/filename as identifier
+  if (IIIF_BASE) {
+    return iiifUrl(slug, photoId, 1600);
+  }
+  // Bare local dev (no Docker, no IIIF): serve original downloaded file
   if (localFilename) {
     const localPath = path.join(IMAGES_DIR, slug, localFilename);
-    if (fs.existsSync(localPath)) {
-      return `/images/${slug}/${localFilename}`;
-    }
-  }
-  if (!localFilename && photoId) {
-    const fallback = `${photoId}.jpg`;
-    const fallbackPath = path.join(IMAGES_DIR, slug, fallback);
-    if (fs.existsSync(fallbackPath)) {
-      return `/images/${slug}/${fallback}`;
-    }
+    if (fs.existsSync(localPath)) return `/images/${slug}/${localFilename}`;
   }
   return originalUrl || "";
 }
 
-function resolveThumbnailSrc(slug: string, localFilename: string, photoId?: string): string {
-  const id = localFilename ? path.parse(localFilename).name : photoId;
-  if (!id) return "";
-  const thumbPath = path.join(IMAGES_DIR, slug, "thumbs", `${id}.webp`);
-  if (fs.existsSync(thumbPath)) {
-    return `/images/${slug}/thumbs/${id}.webp`;
+function resolveThumbnailSrc(
+  slug: string,
+  localFilename: string,
+  photoId: string,
+  iaIdentifier: string,
+): string {
+  // Local optimized / offline build: relative thumbnail paths
+  if (LOCAL_IMAGE_BASE) {
+    return `${LOCAL_IMAGE_BASE}/${slug}/${photoId}_thumb.jpg`;
   }
+  // GCS-direct: optimized thumbnail JPEG, no IIIF server needed
+  if (GCS_IMAGE_BASE) {
+    return `${GCS_IMAGE_BASE}/web/${slug}/${photoId}_thumb.jpg`;
+  }
+  // Internet Archive IIIF — requires ia_identifier
+  if (IIIF_BASE && IIIF_BASE.includes("archive.org") && iaIdentifier) {
+    return iiifUrl(iaIdentifier, photoId, 400);
+  }
+  // Cantaloupe (local Docker or GCS Cloud Run) — uses slug/filename as identifier
+  if (IIIF_BASE) {
+    return iiifUrl(slug, photoId, 400);
+  }
+  // Bare local dev: no thumbnails
   return "";
 }
 
-function parseAlbumCsv(filePath: string): Album {
-  const content = fs.readFileSync(filePath, "utf-8");
-  const result = Papa.parse<CsvRow>(content, {
+function parseAlbumCsvText(text: string, slug: string): Album {
+  const result = Papa.parse<CsvRow>(text, {
     header: true,
     skipEmptyLines: true,
   });
 
   const rows = result.data;
   if (rows.length === 0) {
-    throw new Error(`Empty CSV: ${filePath}`);
+    throw new Error(`Empty CSV for slug: ${slug}`);
   }
 
   const first = rows[0];
-  const slug = path.basename(filePath, ".csv");
+  const iaIdentifier = first.ia_identifier || "";
 
   const photos: Photo[] = rows.map((row) => {
-    const imageSrc = resolveImageSrc(slug, row.local_filename, row.original_url, row.photo_id);
-    const thumbnailSrc = resolveThumbnailSrc(slug, row.local_filename, row.photo_id);
+    const rowIaId = row.ia_identifier || iaIdentifier;
+    const imageSrc = resolveImageSrc(slug, row.local_filename, row.original_url, row.photo_id, rowIaId);
+    const thumbnailSrc = resolveThumbnailSrc(slug, row.local_filename, row.photo_id, rowIaId);
     return {
       photo_id: row.photo_id,
       photo_title: row.photo_title || "",
@@ -124,6 +164,7 @@ function parseAlbumCsv(filePath: string): Album {
       license: row.license || "",
       original_url: row.original_url || "",
       local_filename: row.local_filename || "",
+      ia_identifier: rowIaId,
       image_src: imageSrc,
       thumbnail_src: thumbnailSrc,
     };
@@ -140,6 +181,7 @@ function parseAlbumCsv(filePath: string): Album {
     album_photo_count: parseInt(first.album_photo_count, 10) || 0,
     album_date_created: first.album_date_created || "",
     slug,
+    ia_identifier: iaIdentifier,
     exhibition_title: first.exhibition_title || "",
     artists: splitSemicolon(first.artists),
     curator: first.curator || "",
@@ -158,31 +200,50 @@ function parseAlbumCsv(filePath: string): Album {
   };
 }
 
-let _cache: Album[] | null = null;
+function parseAlbumCsv(filePath: string): Album {
+  const content = fs.readFileSync(filePath, "utf-8");
+  const slug = path.basename(filePath, ".csv");
+  return parseAlbumCsvText(content, slug);
+}
 
-export function getAllAlbums(): Album[] {
-  if (_cache) return _cache;
+async function _loadFromGcs(): Promise<Album[]> {
+  const res = await fetch(`${GCS_BASE}/csv/manifest.json`);
+  if (!res.ok) return [];
+  const manifest = await res.json() as { slugs: string[] };
+  const albums = await Promise.all(
+    manifest.slugs.map(async (slug) => {
+      const r = await fetch(`${GCS_BASE}/csv/${slug}.csv`);
+      if (!r.ok) return null;
+      return parseAlbumCsvText(await r.text(), slug);
+    })
+  );
+  return albums.filter((a): a is Album => a !== null);
+}
 
-  if (!fs.existsSync(CSV_DIR)) {
-    return [];
-  }
-
-  const files = fs
-    .readdirSync(CSV_DIR)
+function _loadFromFilesystem(): Album[] {
+  if (!fs.existsSync(CSV_DIR)) return [];
+  return fs.readdirSync(CSV_DIR)
     .filter((f) => f.endsWith(".csv"))
-    .sort();
+    .sort()
+    .map((f) => parseAlbumCsv(path.join(CSV_DIR, f)));
+}
 
-  _cache = files.map((f) => parseAlbumCsv(path.join(CSV_DIR, f)));
+let _cache: Promise<Album[]> | null = null;
+
+export function getAllAlbums(): Promise<Album[]> {
+  if (!_cache)
+    _cache = GCS_BASE ? _loadFromGcs() : Promise.resolve(_loadFromFilesystem());
   return _cache;
 }
 
-export function getAlbumBySlug(slug: string): Album | undefined {
-  return getAllAlbums().find((a) => a.slug === slug);
+export async function getAlbumBySlug(slug: string): Promise<Album | undefined> {
+  const albums = await getAllAlbums();
+  return albums.find((a) => a.slug === slug);
 }
 
 /** Group albums by academic year (Aug-Jul). Key format: "2023-24" */
-export function getAlbumsByYear(): Map<string, Album[]> {
-  const albums = getAllAlbums();
+export async function getAlbumsByYear(): Promise<Map<string, Album[]>> {
+  const albums = await getAllAlbums();
   const map = new Map<string, Album[]>();
   for (const album of albums) {
     const date = album.opening_date || album.album_date_created;
@@ -191,8 +252,6 @@ export function getAlbumsByYear(): Map<string, Album[]> {
     const month = d.getMonth(); // 0-indexed
     const year = d.getFullYear();
     // Academic year: Aug (7) through Jul (6)
-    // If month >= 7 (Aug), it's the start of academic year YEAR-(YEAR+1)
-    // If month < 7 (Jan-Jul), it's the end of academic year (YEAR-1)-YEAR
     const startYear = month >= 7 ? year : year - 1;
     const key = `${startYear}-${String(startYear + 1).slice(2)}`;
     if (!map.has(key)) map.set(key, []);
@@ -203,15 +262,15 @@ export function getAlbumsByYear(): Map<string, Album[]> {
 }
 
 /** Return a random album */
-export function getRandomAlbum(): Album | undefined {
-  const albums = getAllAlbums();
+export async function getRandomAlbum(): Promise<Album | undefined> {
+  const albums = await getAllAlbums();
   if (albums.length === 0) return undefined;
   return albums[Math.floor(Math.random() * albums.length)];
 }
 
 /** Return the N most recently created albums */
-export function getRecentAlbums(n: number): Album[] {
-  const albums = getAllAlbums();
+export async function getRecentAlbums(n: number): Promise<Album[]> {
+  const albums = await getAllAlbums();
   return [...albums]
     .sort((a, b) => {
       const da = a.album_date_created || "";

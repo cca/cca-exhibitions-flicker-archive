@@ -7,9 +7,8 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "thumbs": "npx tsx scripts/generate-thumbs.ts",
-    "prebuild": "npm run thumbs",
     "build": "astro build",
+    "build:offline": "PUBLIC_LOCAL_IMAGE_BASE=/web astro build",
     "preview": "astro preview",
     "astro": "astro"
   },
@@ -18,9 +17,5 @@
     "astro": "^6.0.2",
     "papaparse": "^5.5.3"
   },
-  "devDependencies": {
-    "sharp": "^0.33.0",
-    "p-limit": "^6.0.0",
-    "tsx": "^4.0.0"
-  }
+  "devDependencies": {}
 }
