@@ -2,7 +2,7 @@
 
 from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -83,7 +83,7 @@ Extracted fields:
 """
 
 
-def _build_model(settings: Settings) -> AnthropicModel | OpenAIModel | str:
+def _build_model(settings: Settings) -> AnthropicModel | OpenAIChatModel | str:
     """Build the model instance, passing API key explicitly if available."""
     if settings.anthropic_api_key and settings.llm_model.startswith("anthropic:"):
         model_name = settings.llm_model.removeprefix("anthropic:")
@@ -93,7 +93,7 @@ def _build_model(settings: Settings) -> AnthropicModel | OpenAIModel | str:
         )
     if settings.openai_api_key and settings.llm_model.startswith("openai:"):
         model_name = settings.llm_model.removeprefix("openai:")
-        return OpenAIModel(
+        return OpenAIChatModel(
             model_name,
             provider=OpenAIProvider(api_key=settings.openai_api_key),
         )
