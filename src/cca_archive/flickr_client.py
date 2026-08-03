@@ -145,7 +145,7 @@ class FlickrClient:
                 self.api.photosets.getList,
                 user_id=self.user_id,
                 page=page,
-                per_page=500,
+                per_page=500,  # Flickr's max; cannot be increased
             )
             photosets = resp["photosets"]
             albums.extend(photosets["photoset"])
@@ -174,7 +174,7 @@ class FlickrClient:
                 user_id=self.user_id,
                 extras=PHOTO_EXTRAS,
                 page=page,
-                per_page=500,
+                per_page=500,  # Flickr's max; cannot be increased
             )
             photoset = resp["photoset"]
             photos.extend(photoset["photo"])
@@ -189,9 +189,23 @@ class FlickrClient:
         """Call a Flickr API method with retry logic."""
         return api_method(**kwargs)
 
-    def build_album_record(self, album_id: str) -> AlbumRecord:
-        """Build a full AlbumRecord from API data."""
-        info = self.get_album_info(album_id)
+    def build_album_record(
+        self, album_id: str, album_data: dict[str, Any] | None = None
+    ) -> AlbumRecord:
+        """Build a full AlbumRecord from API data.
+
+        Args:
+            album_id: Flickr album/photoset ID
+            album_data: Optional pre-fetched album metadata from get_all_albums().
+                If provided, skips the redundant get_album_info() API call.
+        """
+        if album_data is None:
+            # Single album mode - fetch info via API
+            info = self.get_album_info(album_id)
+        else:
+            # Batch mode - reuse data from get_all_albums()
+            info = album_data
+
         raw_photos = self.get_album_photos(album_id)
 
         title = _text(info.get("title"))

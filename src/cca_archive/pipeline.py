@@ -54,6 +54,7 @@ def _is_complete(album: dict, manifest: dict, existing_csvs: set[str]) -> bool:
 async def process_album(
     album_id: str,
     client: FlickrClient,
+    album_data: dict | None = None,
     skip_download: bool = False,
     skip_llm: bool = False,
     skip_tiff_convert: bool = False,
@@ -63,13 +64,25 @@ async def process_album(
 ) -> int:
     """Process a single album: fetch data, extract metadata, download, export CSV.
 
+    Args:
+        album_id: Flickr album/photoset ID
+        client: FlickrClient instance
+        album_data: Optional pre-fetched album metadata from get_all_albums().
+            If provided, skips redundant get_album_info() API call.
+        skip_download: Skip image downloads
+        skip_llm: Skip LLM metadata extraction
+        skip_tiff_convert: Skip TIFF conversion
+        skip_optimize: Skip image optimization
+        upload_ia: Upload to Internet Archive
+        upload_gcs: Upload to Google Cloud Storage
+
     Returns the number of photos in the album.
     """
     settings = client.settings
     manifest = load_manifest(settings)
 
     console.print(f"\n[bold]Fetching album [cyan]{album_id}[/cyan]...[/bold]")
-    album = client.build_album_record(album_id)
+    album = client.build_album_record(album_id, album_data)
     console.print(f"  Title: [green]{album.title}[/green]")
     console.print(f"  Photos: {album.photo_count}")
 
@@ -289,8 +302,15 @@ async def process_all_albums(
         album_id = str(a["id"])
         try:
             photo_count = await process_album(
-                album_id, client, skip_download, skip_llm, skip_tiff_convert,
-                skip_optimize=skip_optimize, upload_ia=upload_ia, upload_gcs=upload_gcs,
+                album_id,
+                client,
+                album_data=a,  # Pass pre-fetched album data to skip redundant API call
+                skip_download=skip_download,
+                skip_llm=skip_llm,
+                skip_tiff_convert=skip_tiff_convert,
+                skip_optimize=skip_optimize,
+                upload_ia=upload_ia,
+                upload_gcs=upload_gcs,
             )
             total_albums_processed += 1
             total_photos += photo_count
@@ -595,7 +615,11 @@ def main() -> None:
     else:
         album_id = parse_album_url(args.album_url)
         asyncio.run(process_album(
-            album_id, client, args.skip_download, args.skip_llm,
+            album_id,
+            client,
+            album_data=None,  # Single album mode - no pre-fetched data
+            skip_download=args.skip_download,
+            skip_llm=args.skip_llm,
             skip_tiff_convert=args.skip_tiff_convert,
             skip_optimize=args.skip_optimize,
             upload_ia=args.upload_ia,
