@@ -4,7 +4,7 @@ Archives the CCA Exhibitions Flickr account (~15,000+ photos across 300+ albums)
 
 ## Setup
 
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and libvips (only if image optimization is used, `brew install vips`).
 
 ```bash
 # Install dependencies
@@ -18,7 +18,7 @@ cp .env.example .env
 ### Required environment variables
 
 | Variable | Description |
-|---|---|
+| --- | --- |
 | `FLICKR_API_KEY` | Flickr API key ([get one here](https://www.flickr.com/services/api/keys/)) |
 | `FLICKR_API_SECRET` | Flickr API secret |
 | `FLICKR_USER_ID` | Flickr user ID for the CCA Exhibitions account |
@@ -29,7 +29,7 @@ cp .env.example .env
 ### Optional environment variables
 
 | Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `OUTPUT_DIR` | `output` | Base directory for images and CSVs |
 | `DOWNLOAD_CONCURRENCY` | `3` | Simultaneous downloads / optimizations / TIFF conversions |
 | `SKIP_LLM` | `false` | Disable LLM extraction globally |
@@ -57,7 +57,7 @@ uv run cca-archive --all
 ### Options
 
 | Flag | Description |
-|---|---|
+| --- | --- |
 | `--all` | Process all albums for the configured user |
 | `--skip-download` | Skip image downloads (metadata and CSV only) |
 | `--skip-llm` | Skip LLM metadata extraction |
@@ -116,7 +116,7 @@ uv run cca-archive backfill-manifest
 ## Pipeline stages
 
 | Stage | Output | Skip flag |
-|---|---|---|
+| --- | --- | --- |
 | Flickr metadata fetch | in-memory | — |
 | LLM extraction | `ExhibitionMetadata` struct | `--skip-llm` |
 | Image download | `output/images/{slug}/` | `--skip-download` |
@@ -129,7 +129,7 @@ Every stage writes its status to `output/manifest.json`. Re-runs are safe — ea
 
 ## Output
 
-```
+```txt
 output/
 ├── images/{slug}/               # raw downloads (original resolution)
 │   ├── 12345678.jpg
@@ -166,7 +166,7 @@ Four deployment modes (bare local, Docker + Cantaloupe, Docker + nginx offline, 
 ## Validated example albums
 
 | Album | ID | Photos | Era | What it tests |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | **Afterlight** | `72177720332161605` | 59 | 2026 | Structured modern format. Curator is a seminar, photographer backfilled from photo titles. |
 | **Josh "Sioux" Reyes** | `72157691676973492` | 12 | 2018 | HTML tags, Instagram handle, "Images courtesy of" credit, stage-name ambiguity. |
 | **New Look** | `72157659826175192` | 15 | 2015 | Sparse 114-char description; no artists, curator, or medium. |
@@ -204,7 +204,7 @@ LLM_MODEL=openai:gpt-4o
 
 ## Project structure
 
-```
+```txt
 src/cca_archive/
 ├── config.py            # Settings from .env via pydantic-settings
 ├── models.py            # ExhibitionMetadata, PhotoRecord, AlbumRecord
