@@ -156,7 +156,6 @@ LLM_MODEL=openai:gpt-4o
 |---|---|---|
 | `GCS_BUCKET` | — | GCS bucket name |
 | `GCS_CREDENTIALS_FILE` | — | Path to service account JSON. Omit to use Application Default Credentials (ADC). |
-| `GCS_PUBLIC_BASE` | — | Public base URL for the bucket (e.g. `https://storage.googleapis.com/my-bucket`). Used to construct public image URLs in the manifest. |
 
 ---
 

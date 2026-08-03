@@ -33,7 +33,6 @@ class Settings(BaseSettings):
     output_dir: Path = Path("output")
     download_concurrency: int = 1
     download_rate: float = 0.5  # tokens per second for Flickr CDN (1 req / 2s)
-    gcs_public_base: str = ""  # public GCS base URL, e.g. "https://storage.googleapis.com/my-bucket"
 
     @model_validator(mode="after")
     def _check_llm_api_key(self) -> "Settings":
