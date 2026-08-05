@@ -56,9 +56,11 @@ def _retry_api_call(max_retries: int = 3, base_delay: float = 1.0):
     return decorator
 
 # Extras to request from Flickr API to avoid per-photo API calls
+# Request multiple sizes so user can configure preference via FLICKR_IMAGE_SIZE
+# url_k=2048px, url_h=1600px, url_l=1024px, url_c=800px, url_z=640px, url_m=500px, url_o=original
 PHOTO_EXTRAS = (
     "description,date_taken,date_upload,views,tags,"
-    "license,url_o,url_l,url_m,original_format"
+    "license,url_o,url_k,url_h,url_l,url_c,url_z,url_m,original_format"
 )
 
 # License map from Flickr license IDs
@@ -268,6 +270,10 @@ def _parse_photo(data: dict[str, Any]) -> PhotoRecord:
         views=int(data.get("views", 0)),
         license=LICENSE_MAP.get(str(data.get("license", "")), None),
         original_url=data.get("url_o"),
-        large_url=data.get("url_l"),
-        medium_url=data.get("url_m"),
+        large_2048_url=data.get("url_k"),
+        large_1600_url=data.get("url_h"),
+        large_1024_url=data.get("url_l"),
+        medium_800_url=data.get("url_c"),
+        medium_640_url=data.get("url_z"),
+        medium_500_url=data.get("url_m"),
     )

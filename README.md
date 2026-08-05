@@ -159,6 +159,25 @@ An Astro static site in `frontend/` renders the archive data. It supports four i
 cd frontend && npm install && npm run dev   # local dev server at localhost:4321
 ```
 
+## Avoiding Flickr CDN rate limits
+
+By default, the app downloads **large images** (1024-2048px, `FLICKR_IMAGE_SIZE=large`), which provides high quality while balancing against CDN rate limits. Flickr's CDN rate-limits original file downloads heavily, but permits sized versions at much higher rates.
+
+Available size options (smallest to largest):
+
+- `small` — 500px on longest side (~80-200 KB per image)
+- `medium` — 640-800px on longest side (~150-350 KB per image)
+- `large` — 1024-2048px on longest side (~300-1500 KB per image) **← default**
+- `original` — Original uploaded resolution (5-20+ MB per image, **triggers heavy rate limiting**)
+
+Each size option tries multiple resolutions (e.g., "large" tries 2048px → 1600px → 1024px) and falls back to smaller sizes if unavailable.
+
+To change the download size:
+
+```bash
+FLICKR_IMAGE_SIZE=original   # Full resolution (expect rate limit delays)
+```
+
 ## Deployment
 
 Four deployment modes (bare local, Docker + Cantaloupe, Docker + nginx offline, GCS + Cloud Run) are documented in [`docs/deployment.md`](docs/deployment.md). Docker Compose files and Cloud Build configs are included in the repo.

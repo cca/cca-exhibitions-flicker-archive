@@ -7,13 +7,46 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import httpx
 import pytest
 
+from cca_archive.config import Settings
 from cca_archive.downloader import (
     TokenBucketLimiter,
     _get_download_url,
     _get_extension,
     download_photos,
 )
+from cca_archive.config import Settings
+
 from cca_archive.models import PhotoRecord
+
+
+
+def _make_settings(**kwargs) -> Settings:
+    """Create a test Settings instance with defaults."""
+    defaults = {
+        "flickr_api_key": "test",
+        "flickr_api_secret": "test",
+        "flickr_user_id": "test",
+        "skip_llm": True,
+        "download_concurrency": 1,
+        "download_rate": 0.5,
+        "flickr_image_size": "medium-800",
+    }
+    defaults.update(kwargs)
+    return Settings(**defaults)  # type: ignore[call-arg]
+
+def _make_settings(**kwargs) -> Settings:
+    """Create a test Settings instance with defaults."""
+    defaults = {
+        "flickr_api_key": "test",
+        "flickr_api_secret": "test",
+        "flickr_user_id": "test",
+        "skip_llm": True,
+        "download_concurrency": 1,
+        "download_rate": 0.5,
+        "flickr_image_size": "medium-800",
+    }
+    defaults.update(kwargs)
+    return Settings(**defaults)  # type: ignore[call-arg]
 
 
 # ---------------------------------------------------------------------------
@@ -22,14 +55,24 @@ from cca_archive.models import PhotoRecord
 
 
 class TestGetDownloadUrl:
-    def test_prefers_original(self):
+    def test_prefers_medium_800_by_default(self):
+        photo = PhotoRecord(
+            photo_id="1",
+            original_url="https://example.com/orig.jpg",
+            large_url="https://example.com/large.jpg",
+            medium_800_url="https://example.com/med800.jpg",
+            medium_url="https://example.com/med.jpg",
+        )
+        assert _get_download_url(photo, "medium-800") == "https://example.com/med800.jpg"
+
+    def test_original_preference(self):
         photo = PhotoRecord(
             photo_id="1",
             original_url="https://example.com/orig.jpg",
             large_url="https://example.com/large.jpg",
             medium_url="https://example.com/med.jpg",
         )
-        assert _get_download_url(photo) == "https://example.com/orig.jpg"
+        assert _get_download_url(photo, "original") == "https://example.com/orig.jpg"
 
     def test_falls_back_to_large(self):
         photo = PhotoRecord(
@@ -115,7 +158,7 @@ async def test_download_writes_file_and_sets_local_filename(tmp_path: Path):
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        result = await download_photos([photo], tmp_path)
+        result = await download_photos([photo], tmp_path, _make_settings())
 
     assert len(result) == 1
     assert result[0].local_filename == "42.png"
@@ -139,7 +182,7 @@ async def test_skips_already_existing_files(tmp_path: Path):
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        result = await download_photos([photo], tmp_path)
+        result = await download_photos([photo], tmp_path, _make_settings())
 
     # HTTP get should never have been called.
     mock_client.get.assert_not_called()
@@ -166,7 +209,7 @@ async def test_handles_http_error_gracefully(tmp_path: Path):
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        result = await download_photos([photo], tmp_path)
+        result = await download_photos([photo], tmp_path, _make_settings())
 
     assert len(result) == 1
     assert result[0].local_filename is None
@@ -183,7 +226,7 @@ async def test_empty_photo_list(tmp_path: Path):
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        result = await download_photos([], tmp_path)
+        result = await download_photos([], tmp_path, _make_settings())
 
     assert result == []
 
@@ -229,7 +272,7 @@ async def test_retries_on_429_then_succeeds(tmp_path: Path):
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        result = await download_photos([photo], tmp_path)
+        result = await download_photos([photo], tmp_path, _make_settings())
 
     assert result[0].local_filename == "10.jpg"
     assert (tmp_path / "10.jpg").read_bytes() == b"image data"
@@ -258,7 +301,7 @@ async def test_429_exhausts_retries(tmp_path: Path):
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        result = await download_photos([photo], tmp_path)
+        result = await download_photos([photo], tmp_path, _make_settings())
 
     assert result[0].local_filename is None
     assert not (tmp_path / "11.jpg").exists()

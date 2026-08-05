@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     output_dir: Path = Path("output")
     download_concurrency: int = 1
     download_rate: float = 0.5  # tokens per second for Flickr CDN (1 req / 2s)
+    flickr_image_size: str = "large"  # small, medium, large, or original
 
     @model_validator(mode="after")
     def _check_llm_api_key(self) -> "Settings":

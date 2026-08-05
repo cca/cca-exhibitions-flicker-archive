@@ -35,8 +35,12 @@ class PhotoRecord(BaseModel):
     views: int = 0
     license: Optional[str] = None
     original_url: Optional[str] = None
-    large_url: Optional[str] = None
-    medium_url: Optional[str] = None
+    large_2048_url: Optional[str] = None
+    large_1600_url: Optional[str] = None
+    large_1024_url: Optional[str] = None
+    medium_800_url: Optional[str] = None
+    medium_640_url: Optional[str] = None
+    medium_500_url: Optional[str] = None
     local_filename: Optional[str] = None
 
 

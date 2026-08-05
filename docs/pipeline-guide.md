@@ -140,6 +140,8 @@ LLM_MODEL=openai:gpt-4o
 |---|---|---|
 | `OUTPUT_DIR` | `output` | Root directory for all output |
 | `DOWNLOAD_CONCURRENCY` | `3` | Simultaneous image downloads / optimizations / TIFF conversions |
+| `DOWNLOAD_RATE` | `0.5` | Flickr CDN rate limit (tokens/second, 1 req per 2s) |
+| `FLICKR_IMAGE_SIZE` | `large` | Download size: `small` (500px), `medium` (640-800px), `large` (1024-2048px), or `original` |
 | `SKIP_OPTIMIZE` | `false` | Disable image optimization globally |
 
 ### Internet Archive

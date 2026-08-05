@@ -15,6 +15,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
+from .config import Settings
 from .models import PhotoRecord
 
 _console = Console(stderr=True)
@@ -26,9 +27,39 @@ _CIRCUIT_THRESHOLD = 4   # distinct rate-limit events before circuit opens
 _CIRCUIT_RESET = 600.0   # seconds to wait when circuit is open (10 min)
 
 
-def _get_download_url(photo: PhotoRecord) -> str | None:
-    """Pick best available URL: original → large → medium."""
-    return photo.original_url or photo.large_url or photo.medium_url
+def _get_download_url(photo: PhotoRecord, size_preference: str = "large") -> str | None:
+    """Pick best available URL based on configured size preference.
+    
+    Args:
+        photo: PhotoRecord with URL fields
+        size_preference: One of "original", "large", "medium", "small"
+    
+    Returns:
+        Best available URL matching preference, with fallback chain
+    """
+    # Map preference to primary choice + fallback chain
+    if size_preference == "original":
+        urls = [photo.original_url, photo.large_2048_url, photo.large_1600_url, photo.large_1024_url, 
+                photo.medium_800_url, photo.medium_640_url, photo.medium_500_url]
+    elif size_preference == "large":
+        urls = [photo.large_2048_url, photo.large_1600_url, photo.large_1024_url, 
+                photo.medium_800_url, photo.medium_640_url, photo.medium_500_url]
+    elif size_preference == "medium":
+        urls = [photo.medium_800_url, photo.medium_640_url, photo.medium_500_url, 
+                photo.large_1024_url, photo.large_1600_url, photo.large_2048_url]
+    elif size_preference == "small":
+        urls = [photo.medium_500_url, photo.medium_640_url, photo.medium_800_url, 
+                photo.large_1024_url]
+    else:
+        # Default to large
+        urls = [photo.large_2048_url, photo.large_1600_url, photo.large_1024_url, 
+                photo.medium_800_url, photo.medium_640_url, photo.medium_500_url]
+    
+    # Return first non-None URL
+    for url in urls:
+        if url:
+            return url
+    return None
 
 
 def _get_extension(url: str) -> str:
@@ -152,9 +183,10 @@ async def _download_one(
     dest_dir: Path,
     progress: Progress,
     task: object,
+    size_preference: str = "large",
 ) -> PhotoRecord:
     """Download a single photo, retrying on transient errors."""
-    url = _get_download_url(photo)
+    url = _get_download_url(photo, size_preference)
     if url is None:
         progress.advance(task)
         return photo
@@ -209,11 +241,14 @@ async def _download_one(
 async def download_photos(
     photos: list[PhotoRecord],
     dest_dir: Path,
-    concurrency: int = 1,
-    rate: float = 0.5,
+    settings: Settings,
 ) -> list[PhotoRecord]:
     """Download photos concurrently, returning updated PhotoRecords with local_filename set."""
     dest_dir.mkdir(parents=True, exist_ok=True)
+    concurrency = settings.download_concurrency
+    rate = settings.download_rate
+    size_preference = settings.flickr_image_size
+    
     limiter = TokenBucketLimiter(rate=rate, burst=concurrency)
     results: list[PhotoRecord | None] = [None] * len(photos)
     queue: asyncio.Queue = asyncio.Queue()
@@ -241,7 +276,7 @@ async def download_photos(
                         queue.task_done()
                         return
                     idx, photo = item
-                    results[idx] = await _download_one(photo, client, limiter, dest_dir, progress, task)
+                    results[idx] = await _download_one(photo, client, limiter, dest_dir, progress, task, size_preference)
                     queue.task_done()
 
             await asyncio.gather(*[worker() for _ in range(concurrency)])

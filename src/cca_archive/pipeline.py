@@ -127,11 +127,7 @@ async def process_album(
     else:
         dest = settings.images_dir / slug
         console.print(f"  [bold]Downloading images to {dest}...[/bold]")
-        album.photos = await download_photos(
-            album.photos, dest,
-            concurrency=settings.download_concurrency,
-            rate=settings.download_rate,
-        )
+        album.photos = await download_photos(album.photos, dest, settings)
         failed_photo_ids = [p.photo_id for p in album.photos if not p.local_filename]
         dl_status = "partial" if failed_photo_ids else "success"
         if failed_photo_ids:
