@@ -39,6 +39,9 @@ cp .env.example .env
 | `IA_COLLECTION` | `opensource_image` | IA collection to upload into |
 | `GCS_BUCKET` | — | Google Cloud Storage bucket name |
 | `GCS_CREDENTIALS_FILE` | — | Path to GCS service account JSON (omit to use ADC) |
+| `S3_BUCKET` | — | AWS S3 bucket name (optional, for sync only) |
+
+The Google Cloud sync is only the web-ready images, so there is no point in using it with `--skip-optimize`.
 
 ## Usage
 

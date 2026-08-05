@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail # strict mode
+ARG=${1:-}
+if [[ "$ARG" == "--help" || "$ARG" == "-h" ]]; then
+  echo "Usage: $0 [--dryrun|-n]"
+  echo "Syncs the output/ directory to S3_BUCKET/flickr/"
+  echo "-n, --dryrun: perform a dry run (no changes made)"
+  exit 0
+fi
+
+# shellcheck disable=SC1091
+source .env # only for S3_BUCKET
+SOURCE_DIR="output/"
+echo "Syncing $SOURCE_DIR to s3://$S3_BUCKET/flickr/"
+
+if [[ "$ARG" == "--dryrun" || "$ARG" == "-n" ]]; then
+    DRY_RUN_FLAG="--dryrun"
+else
+    DRY_RUN_FLAG=""
+fi
+
+aws s3 sync "$SOURCE_DIR" "s3://$S3_BUCKET/flickr/" --storage-class GLACIER_IR --exclude "*.DS_Store" $DRY_RUN_FLAG
